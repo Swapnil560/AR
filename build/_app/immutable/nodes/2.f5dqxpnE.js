@@ -1,1 +1,0 @@
-import"../chunks/DsnmJJEf.js";import{i as r}from"../chunks/CqFuAgG6.js";import{p as t,f as i,a as m,b as n}from"../chunks/ff_rkm8t.js";import{g as s}from"../chunks/Dsdo-wuW.js";var e=i("<p>Redirecting to admin...</p>");function h(o,p){t(p,!1),s("/admin"),r();var a=e();m(o,a),n()}export{h as component};
