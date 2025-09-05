@@ -1067,16 +1067,27 @@
 				}
 			};
 
-			// Configure MediaRecorder with better settings
-			const options = {
-				mimeType: "video/webm;codecs=vp8",
+			// Configure MediaRecorder with better settings and more compatible format
+			let options = {
+				mimeType: "video/mp4;codecs=h264",
 				videoBitsPerSecond: 2500000,
 			};
 
-			// Fallback to basic webm if vp8 not supported
+			// Try different formats in order of preference
+			if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+				options.mimeType = "video/mp4";
+			}
+
+			if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+				options.mimeType = "video/webm;codecs=vp8";
+			}
+
+			// Fallback to basic webm if nothing else works
 			if (!MediaRecorder.isTypeSupported(options.mimeType)) {
 				options.mimeType = "video/webm";
 			}
+
+			console.log("Using MediaRecorder with mimeType:", options.mimeType);
 
 			mediaRecorder = new MediaRecorder(canvasStream, options);
 
@@ -1147,6 +1158,10 @@
 	}
 
 	async function shareContent() {
+		console.log("shareContent called");
+		console.log("capturedImg:", !!capturedImg);
+		console.log("recordedVideo:", !!recordedVideo);
+
 		try {
 			if (capturedImg) {
 				// Convert data URL to blob
@@ -1177,33 +1192,95 @@
 					);
 				}
 			} else if (recordedVideo) {
+				console.log("Attempting to share video");
 				// Convert video blob to file for sharing
 				const response = await fetch(recordedVideo);
 				const blob = await response.blob();
-				const file = new File([blob], "rongcam-video.webm", {
-					type: "video/webm",
+				console.log("Video blob size:", blob.size, "type:", blob.type);
+
+				// Try different formats for better compatibility
+				let fileName = "rongcam-video.mp4";
+				let mimeType = "video/mp4";
+
+				// Check if the original blob has a specific type
+				if (blob.type) {
+					if (blob.type.includes("webm")) {
+						fileName = "rongcam-video.webm";
+						mimeType = "video/webm";
+					} else if (blob.type.includes("mp4")) {
+						fileName = "rongcam-video.mp4";
+						mimeType = "video/mp4";
+					}
+				}
+
+				console.log("File name:", fileName, "MIME type:", mimeType);
+
+				const file = new File([blob], fileName, {
+					type: mimeType,
 				});
 
-				if (
-					navigator.share &&
-					navigator.canShare &&
-					navigator.canShare({ files: [file] })
-				) {
-					await navigator.share({
-						title: "RongCam AR Video",
-						text: "Festive mood: ON 🔥 Can't wait for #ASoBPuja",
-						files: [file],
-					});
+				console.log("File created:", file.name, file.size, file.type);
+
+				// Check if Web Share API is available and can share files
+				if (navigator.share) {
+					console.log("Web Share API is available");
+
+					if (
+						navigator.canShare &&
+						navigator.canShare({ files: [file] })
+					) {
+						console.log("Can share files with Web Share API");
+						try {
+							await navigator.share({
+								title: "RongCam AR Video",
+								text: "Festive mood: ON 🔥 Can't wait for #ASoBPuja",
+								files: [file],
+							});
+							console.log(
+								"Successfully shared via Web Share API"
+							);
+							return; // Exit function if sharing was successful
+						} catch (shareError) {
+							console.log(
+								"Share API failed, falling back to download:",
+								shareError
+							);
+							// Fallback to download if share fails
+							const link = document.createElement("a");
+							link.href = recordedVideo;
+							link.download = fileName;
+							link.click();
+							alert(
+								"Video downloaded! You can now share it from your device."
+							);
+						}
+					} else {
+						console.log("Cannot share files with Web Share API");
+						// Fallback: download the video
+						const link = document.createElement("a");
+						link.href = recordedVideo;
+						link.download = fileName;
+						link.click();
+						alert(
+							"Video downloaded! You can now share it from your device."
+						);
+					}
 				} else {
+					console.log("Web Share API not available");
 					// Fallback: download the video
 					const link = document.createElement("a");
 					link.href = recordedVideo;
-					link.download = "rongcam-video.webm";
+					link.download = fileName;
 					link.click();
 					alert(
 						"Video downloaded! You can now share it from your device."
 					);
 				}
+			} else {
+				console.log("No content available to share");
+				alert(
+					"No photo or video to share. Please capture something first!"
+				);
 			}
 		} catch (error) {
 			console.error("Error sharing:", error);
@@ -1218,9 +1295,18 @@
 						"Photo downloaded! You can now share it from your device."
 					);
 				} else if (recordedVideo) {
+					const response = await fetch(recordedVideo);
+					const blob = await response.blob();
+
+					// Determine file name based on blob type
+					let fileName = "rongcam-video.mp4";
+					if (blob.type && blob.type.includes("webm")) {
+						fileName = "rongcam-video.webm";
+					}
+
 					const link = document.createElement("a");
 					link.href = recordedVideo;
-					link.download = "rongcam-video.webm";
+					link.download = fileName;
 					link.click();
 					alert(
 						"Video downloaded! You can now share it from your device."

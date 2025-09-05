@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
+	import { getHost } from "$lib/utils";
 	import {
 		getAllUsers,
 		createUser,
@@ -79,14 +80,39 @@
 	};
 
 	onMount(() => {
-		// Check if user is logged in and is super admin
-		const userData = localStorage.getItem("user");
-		if (!userData) {
-			goto("/login");
-			return;
+		// Check for auth parameter in URL (from subdomain redirect)
+		const urlParams = new URLSearchParams(window.location.search);
+		const authParam = urlParams.get("auth");
+
+		if (authParam) {
+			try {
+				// Decode user data from URL parameter
+				const userData = JSON.parse(atob(authParam));
+				console.log("User data from URL:", userData);
+
+				// Store in localStorage for the current domain/subdomain
+				localStorage.setItem("user", JSON.stringify(userData));
+
+				// Clean up URL by removing auth parameter
+				const newUrl = window.location.pathname;
+				window.history.replaceState({}, document.title, newUrl);
+
+				user = userData;
+			} catch (error) {
+				console.error("Error parsing auth parameter:", error);
+				goto("/login");
+				return;
+			}
+		} else {
+			// Check if user is logged in and is super admin
+			const userData = localStorage.getItem("user");
+			if (!userData) {
+				goto("/login");
+				return;
+			}
+			user = JSON.parse(userData);
 		}
 
-		user = JSON.parse(userData);
 		if (user.role !== "super_admin") {
 			goto("/login");
 			return;
@@ -462,7 +488,21 @@
 
 	function logout() {
 		localStorage.removeItem("user");
-		goto("/login");
+
+		// Check if we're on a subdomain
+		const currentHost = window.location.host;
+		const mainHost = getHost();
+
+		if (currentHost !== mainHost) {
+			// We're on a subdomain, redirect to main domain with logout parameter
+			const protocol = window.location.protocol;
+			const logoutUrl = `${protocol}//${mainHost}/login?logout=true`;
+			console.log("Redirecting to main domain for logout:", logoutUrl);
+			window.location.href = logoutUrl;
+		} else {
+			// We're on main domain, just go to login
+			goto("/login");
+		}
 	}
 
 	function clearMessages() {

@@ -26,6 +26,9 @@ importers:
       bcryptjs:
         specifier: ^3.0.2
         version: 3.0.2
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       compressorjs:
         specifier: ^1.2.1
         version: 1.2.1
@@ -35,6 +38,9 @@ importers:
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
+      tailwind-merge:
+        specifier: ^3.3.1
+        version: 3.3.1
       uuid:
         specifier: ^11.1.0
         version: 11.1.0
@@ -905,6 +911,9 @@ packages:
     resolution: {integrity: sha512-7t/ejshehHd+95z3Z7ebS7wsqHDQxi/8nBTuTRwpMgNegfRBfuitCSKTUDKIBOExqfT2+DhQ2VLG8Xn+cBXoaQ==}
     engines: {node: '>=18'}
 
+  tailwind-merge@3.3.1:
+    resolution: {integrity: sha512-gBXpgUm/3rp1lMZZrM/w7D8GKqshif0zAymAhbCyIt8KMe+0v9DQ7cdYLR4FHH/cKpdTXb+A/tKKU3eolfsI+g==}
+
   tinyglobby@0.2.14:
     resolution: {integrity: sha512-tX5e7OM1HnYr2+a2C/4V0htOcSQcoSTH9KgJnVvNm5zm/cyEWKJ7j7YutsH9CxMdtOkkLFy2AHrMci9IM8IPZQ==}
     engines: {node: '>=12.0.0'}
@@ -1682,6 +1691,8 @@ snapshots:
       locate-character: 3.0.0
       magic-string: 0.30.17
       zimmerframe: 1.1.2
+
+  tailwind-merge@3.3.1: {}
 
   tinyglobby@0.2.14:
     dependencies:

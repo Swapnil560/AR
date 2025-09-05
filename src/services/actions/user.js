@@ -30,7 +30,7 @@ export const loginUser = async ({ body: { email, password } }) => {
 			email: email,
 			password: password,
 		},
-		fields: "id,name,email,phone,role",
+		fields: "id,name,email,phone,role,subdomain",
 	});
 	// console.log(response);
 	if (response?.error) throw new Error("Invalid phone or password");
@@ -86,6 +86,14 @@ export async function createUser(body) {
 export async function updateUserRole(userId, newRole) {
 	const response = await Api.put("/users", {
 		body: { id: userId, role: newRole },
+	});
+	return response;
+}
+
+// Update user by email (useful for subdomain linking)
+export async function updateUserByEmail(body) {
+	const response = await Api.put("/users", {
+		body: body,
 	});
 	return response;
 }

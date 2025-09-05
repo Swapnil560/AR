@@ -8,6 +8,7 @@
 	import { onMount } from "svelte";
 	import { sendEmail, OTPEmailTemplate } from "$lib/email.ts";
 	import { hashPassword, comparePassword } from "$lib/bcrypt.ts";
+	import { getHost } from "$lib/utils.ts";
 
 	let isLogin = $state(true); // Toggle between login and signup
 	let showPassword = $state(false);
@@ -29,18 +30,86 @@
 
 	let formData = { ...init };
 
+	// Function to redirect to subdomain URL
+	function redirectToSubdomain(user) {
+		const host = getHost();
+		const protocol = window.location.protocol;
+
+		let targetPath = "";
+		if (user.role === "super_admin") {
+			targetPath = "/superadmin";
+		} else if (user.role === "admin") {
+			targetPath = "/admin";
+		} else {
+			targetPath = "/dashboard";
+		}
+
+		// If user has a subdomain, redirect to subdomain URL
+		if (user.subdomain) {
+			// Store user data in sessionStorage before redirect
+			sessionStorage.setItem("user", JSON.stringify(user));
+
+			// Pass user data as URL parameter (base64 encoded)
+			const userData = btoa(JSON.stringify(user));
+			const subdomainUrl = `${protocol}//${user.subdomain}.${host}${targetPath}?auth=${userData}`;
+
+			console.log("Redirecting to subdomain URL:", subdomainUrl);
+			window.location.href = subdomainUrl;
+		} else {
+			// If no subdomain, use regular navigation
+			console.log(
+				"No subdomain found, using regular navigation to:",
+				targetPath
+			);
+			goto(targetPath);
+		}
+	}
+
 	// Example: check if logged in (localStorage/session/cookie)
 	onMount(() => {
+		// Check for logout parameter (from subdomain logout)
+		const urlParams = new URLSearchParams(window.location.search);
+		const logoutParam = urlParams.get("logout");
+
+		if (logoutParam === "true") {
+			// Clear localStorage on main domain
+			localStorage.removeItem("user");
+			console.log("Logout completed on main domain");
+
+			// Clean up URL by removing logout parameter
+			const newUrl = window.location.pathname;
+			window.history.replaceState({}, document.title, newUrl);
+
+			return; // Don't redirect, stay on login page
+		}
+
+		// Check for auth parameter in URL (from subdomain redirect)
+		const authParam = urlParams.get("auth");
+
+		if (authParam) {
+			try {
+				// Decode user data from URL parameter
+				const userData = JSON.parse(atob(authParam));
+				console.log("User data from URL:", userData);
+
+				// Store in localStorage for the current domain/subdomain
+				localStorage.setItem("user", JSON.stringify(userData));
+
+				// Clean up URL by removing auth parameter
+				const newUrl = window.location.pathname;
+				window.history.replaceState({}, document.title, newUrl);
+
+				return; // Don't redirect again
+			} catch (error) {
+				console.error("Error parsing auth parameter:", error);
+			}
+		}
+
+		// Check localStorage for existing user data
 		const userData = localStorage.getItem("user");
 		if (userData) {
 			const user = JSON.parse(userData);
-			if (user.role === "super_admin") {
-				goto("/superadmin");
-			} else if (user.role === "admin") {
-				goto("/admin");
-			} else {
-				goto("/dashboard");
-			}
+			redirectToSubdomain(user);
 		}
 	});
 
@@ -90,16 +159,13 @@
 				}
 
 				const user = loginRes.result;
+				console.log("User login data:", user);
+
 				// Save login info, e.g. to localStorage
 				localStorage.setItem("user", JSON.stringify(user));
-				// Redirect based on user role
-				if (user.role === "super_admin") {
-					goto("/superadmin");
-				} else if (user.role === "admin") {
-					goto("/admin");
-				} else {
-					goto("/dashboard");
-				}
+
+				// Redirect to subdomain URL
+				redirectToSubdomain(user);
 			} else {
 				const existingUsers = await getUsers({
 					search: `email:${formData.email}`,
@@ -152,24 +218,43 @@
 			};
 
 			const saveRes = await saveUser(userDataWithHashedPassword);
+			console.log("Save user response:", saveRes);
+
 			if (saveRes.err) {
 				error = "Error creating account. Please try again.";
 			} else {
-				successMsg = "Account created successfully! You can now login.";
-				isLogin = true;
-				formData = { ...init };
+				// Store user data with ID from response temporarily and redirect to subdomain selection
+				const userDataWithId = {
+					...userDataWithHashedPassword,
+					id: saveRes.result?.id || saveRes.id || saveRes.insertId, // Handle different response structures
+				};
+
+				console.log("User data to store:", userDataWithId);
+
+				localStorage.setItem(
+					"tempUser",
+					JSON.stringify(userDataWithId)
+				);
+				successMsg =
+					"Account created successfully! Redirecting to subdomain selection...";
+
+				setTimeout(() => {
+					goto("/subdomain");
+				}, 2000);
 			}
 		} else {
 			error = "Invalid OTP. Please try again.";
 		}
 
-		setTimeout(() => {
-			otpSent = false;
-			inputOtp = "";
-			successMsg = "";
-			isLogin = true;
-			formData.password = "";
-		}, 2000);
+		if (inputOtp !== savedOtp) {
+			setTimeout(() => {
+				otpSent = false;
+				inputOtp = "";
+				successMsg = "";
+				isLogin = true;
+				formData.password = "";
+			}, 2000);
+		}
 	};
 </script>
 
