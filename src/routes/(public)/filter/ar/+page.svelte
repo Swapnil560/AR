@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { onMount } from "svelte";
+	import { onMount, onDestroy } from "svelte";
 	import { page } from "$app/stores";
 	import {
 		Camera,
 		Import,
 		RefreshCcw,
+		RefreshCw,
 		Share2,
 		Sparkles,
 		Video,
@@ -44,6 +45,11 @@
 	let userFilters = []; // Store user's filters
 	let currentUserId = null; // Store current user ID
 	let isFlashOn = false; // Track flash state
+	let isProcessingVideo = false; // Track video processing state
+
+	// Video recording countdown
+	let recordingCountdown = 0; // Countdown timer for video recording
+	let countdownInterval: number | null = null; // Store interval ID
 
 	// Face tracking variables
 	let faceMesh = null;
@@ -52,6 +58,11 @@
 	let selectedAdditionalFilter = null;
 	let faceDetections = [];
 	let animationFrameId = null;
+	let isFaceTrackingRunning = false; // ensure only one RAF loop
+	let isFaceMeshBusy = false; // prevent concurrent faceMesh.send
+
+	// Pin MediaPipe CDN version to avoid asset mismatches
+	const MEDIAPIPE_FACE_MESH_VERSION = "0.4.1633559619";
 
 	// Additional filters available
 	const additionalFilters = [
@@ -66,8 +77,14 @@
 		// Add more filters here as needed
 	];
 
+	// Debug reactive statement
+	$: if (showAdditionalFiltersModal) {
+		console.log("Additional filters modal should be visible now");
+	}
+
 	onMount(async () => {
-		await loadFilter();
+		// Fire-and-forget filter load so camera doesn't wait on network/image decode
+		loadFilter();
 		await startCamera();
 
 		// Initialize offscreen canvas for better performance
@@ -99,7 +116,26 @@
 		try {
 			// First, check if filter URL is provided in query parameters
 			const filterParam = $page.url.searchParams.get("filter");
-			const userParam = $page.url.searchParams.get("user");
+			let userParam = $page.url.searchParams.get("user");
+
+			// Handle new URL format: ?filter=filename&userid (without user= prefix)
+			if (filterParam && !userParam) {
+				// Parse the URL manually to get the second parameter without a key
+				const urlParams = window.location.search
+					.substring(1)
+					.split("&");
+				if (urlParams.length >= 2) {
+					const secondParam = urlParams[1];
+					// If second param doesn't contain '=', it's the user ID
+					if (!secondParam.includes("=")) {
+						userParam = secondParam;
+						console.log(
+							"Parsed user ID from new format:",
+							userParam
+						);
+					}
+				}
+			}
 
 			if (filterParam) {
 				// Check if it's a shortened URL (filename only) or full URL
@@ -107,13 +143,16 @@
 					// Full URL - use as is
 					filterUrl = decodeURIComponent(filterParam);
 				} else {
-					// Shortened URL - reconstruct full URL
-					filterUrl = FILTER_BASE_URL + filterParam;
+					// Shortened URL - reconstruct full URL and add .png if missing
+					const filename = filterParam.endsWith(".png")
+						? filterParam
+						: filterParam + ".png";
+					filterUrl = FILTER_BASE_URL + filename;
 				}
 				console.log("Filter URL:", filterUrl);
 
-				// Pre-load the filter image for faster captures
-				await preloadFilterImage(filterUrl);
+				// Pre-load the filter image in background for faster captures
+				preloadFilterImage(filterUrl);
 
 				if (userParam) {
 					currentUserId = userParam;
@@ -129,34 +168,109 @@
 			// Fallback to localStorage
 			filterUrl = localStorage.getItem("rongcam_demo_filter");
 			if (filterUrl) {
-				await preloadFilterImage(filterUrl);
+				preloadFilterImage(filterUrl);
 			} else {
 				filterLoadError = true;
+			}
+		}
+
+		// If no query param and no exception, try localStorage as a non-error fallback
+		if (!filterUrl) {
+			const ls = localStorage.getItem("rongcam_demo_filter");
+			if (ls) {
+				filterUrl = ls;
+				preloadFilterImage(filterUrl);
 			}
 		}
 	}
 
 	// Pre-load filter image for faster captures
+	// Uses in-memory cache, preconnects to CDN, and decodes image for consistent readiness
+	const imageCache: Map<string, HTMLImageElement> = new Map();
+	let imageLoadController: AbortController | null = null;
+
+	function ensurePreconnect(resourceUrl: string) {
+		try {
+			if (typeof document === "undefined") return;
+			const a = document.createElement("a");
+			a.href = resourceUrl;
+			const origin = `${a.protocol}//${a.host}`;
+			const existing = document.head.querySelector(
+				`link[rel="preconnect"][href="${origin}"]`
+			);
+			if (!existing) {
+				const preconnect = document.createElement("link");
+				preconnect.rel = "preconnect";
+				preconnect.href = origin;
+				preconnect.crossOrigin = "anonymous";
+				document.head.appendChild(preconnect);
+				// Also add dns-prefetch as a lightweight hint
+				const dns = document.createElement("link");
+				dns.rel = "dns-prefetch";
+				dns.href = origin;
+				document.head.appendChild(dns);
+			}
+		} catch (_) {
+			// best-effort only
+		}
+	}
+
 	async function preloadFilterImage(url: string) {
 		if (!url) return;
 
 		try {
 			isFilterLoading = true;
+
+			// Reuse from cache if available
+			const cached = imageCache.get(url);
+			if (cached && cached.complete && cached.naturalWidth > 0) {
+				preloadedFilterImage = cached;
+				console.log("Filter image served from in-memory cache");
+				return;
+			}
+
+			// Warm up DNS/TLS for the CDN to reduce latency spikes
+			ensurePreconnect(url);
+
+			// Cancel any previous in-flight image load
+			try {
+				imageLoadController?.abort();
+			} catch (_) {}
+			imageLoadController =
+				typeof AbortController !== "undefined"
+					? new AbortController()
+					: null;
+
 			const img = new Image();
 			img.crossOrigin = "anonymous";
+			// Hint the browser to prioritize this fetch and decode off the main thread
+			(img as any).fetchPriority = "high";
+			img.decoding = "async" as any;
 
-			await new Promise((resolve, reject) => {
-				img.onload = () => {
-					console.log("Filter image preloaded successfully");
-					resolve(img);
+			await new Promise<void>((resolve, reject) => {
+				let settled = false;
+				img.onload = async () => {
+					try {
+						// Ensure pixels are decoded before we mark it ready
+						if (typeof img.decode === "function") {
+							await img.decode().catch(() => {});
+						}
+						settled = true;
+						resolve();
+					} catch (e) {
+						console.warn("Image decode warning:", e);
+						settled = true;
+						resolve();
+					}
 				};
 				img.onerror = (error) => {
-					console.error("Failed to preload filter image:", error);
-					reject(error);
+					if (!settled) reject(error);
 				};
+				// Kick off request last to avoid any race
 				img.src = url;
 			});
 
+			imageCache.set(url, img);
 			preloadedFilterImage = img;
 		} catch (error) {
 			console.error("Error preloading filter image:", error);
@@ -229,7 +343,11 @@
 
 	async function toggleFlash() {
 		// Change the flash button behavior to show additional filters modal
-		showAdditionalFiltersModal = true;
+		console.log("toggleFlash called - showing additional filters modal");
+		// Ensure state change happens immediately
+		setTimeout(() => {
+			showAdditionalFiltersModal = true;
+		}, 0);
 	}
 
 	// Initialize MediaPipe Face Mesh
@@ -244,7 +362,7 @@
 
 			faceMesh = new FaceMesh({
 				locateFile: (file) =>
-					`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+					`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${MEDIAPIPE_FACE_MESH_VERSION}/${file}`,
 			});
 
 			faceMesh.setOptions({
@@ -260,7 +378,12 @@
 			console.log("Face tracking initialized");
 
 			// Start face tracking if camera is already active
-			if (isCameraActive && videoRef && videoRef.readyState >= 2) {
+			if (
+				isCameraActive &&
+				videoRef &&
+				videoRef.readyState >= 2 &&
+				!isFaceTrackingRunning
+			) {
 				setTimeout(() => {
 					startFaceTracking();
 					console.log(
@@ -426,46 +549,54 @@
 				(hairlineRight.x - hairlineLeft.x) * width
 			);
 			const earWidth = Math.abs((rightEarArea.x - leftEarArea.x) * width);
-			const headWidth = Math.max(templeWidth, hairlineWidth, earWidth);
+			// Stable head width from temples blended slightly with eye-distance
+			const eyeToHeadRatio = 2.2; // empirical conversion
+			const eyeBasedWidth = eyeDistance * eyeToHeadRatio;
+			const headWidth = templeWidth * 0.8 + eyeBasedWidth * 0.2;
 
 			// Calculate actual head height for better proportioning
 			const actualHeadHeight = Math.abs(
 				(foreheadCenter.y - chin.y) * height
 			);
 
-			// Much more generous scaling to ensure cap covers the entire head
-			const baseHeadWidth = 140; // Smaller baseline for larger scaling
-			const baseHeadHeight = 200; // Smaller baseline for larger scaling
+			// Responsive sizing across device classes
+			const minDim = Math.min(window.innerWidth, window.innerHeight);
+			// Use temple/hairline width as primary base for fitting
+			const baseHeadFitWidth = Math.max(templeWidth, hairlineWidth);
+			let sizeFactor = 1.22; // conservative, close fit
+			if (minDim <= 400) {
+				sizeFactor = 1.18; // small phones
+			} else if (minDim <= 700) {
+				sizeFactor = 1.24; // medium screens
+			} else {
+				sizeFactor = 1.28; // large screens
+			}
 
-			const widthScale = headWidth / baseHeadWidth;
-			const heightScale = actualHeadHeight / baseHeadHeight;
-			const eyeScale = eyeDistance / 50; // Smaller baseline for larger cap
+			// Base size from head-fit width (adapts with distance)
+			filterWidth = baseHeadFitWidth * sizeFactor;
+			filterHeight = filterWidth * 0.55; // slightly slimmer cap height
 
-			// Use the largest scale factor to ensure cap is big enough
-			const capScale = Math.max(widthScale, heightScale, eyeScale);
-			const finalCapScale = Math.max(0.8, Math.min(4.0, capScale)); // Much larger range
+			// Tight clamps around base head width to avoid oversized results
+			const minCapWidth = baseHeadFitWidth * 1.1;
+			const maxCapWidth = baseHeadFitWidth * 1.45;
+			filterWidth = Math.min(
+				Math.max(filterWidth, minCapWidth),
+				maxCapWidth
+			);
+			filterHeight = filterWidth * 0.55;
 
-			// Make cap significantly larger to properly cover head with adaptive sizing
-			const baseSizeMultiplier = 2.4; // Even larger base size
-			const pitchSizeAdjustment = 1 + Math.abs(pitchAngle) * 0.3; // Larger when looking up/down
+			// Limit per-frame size change to avoid sudden growth/shrink when moving
+			if (filter.smoothing && filter.smoothing.width) {
+				const prevW = filter.smoothing.width;
+				const maxUp = prevW * 1.1; // +10% per frame
+				const minDown = prevW * 0.9; // -10% per frame
+				filterWidth = Math.min(Math.max(filterWidth, minDown), maxUp);
+				filterHeight = filterWidth * 0.55;
+			}
 
-			filterWidth =
-				headWidth *
-				baseSizeMultiplier *
-				finalCapScale *
-				pitchSizeAdjustment;
-			filterHeight = filterWidth * 0.6; // Proper cap proportions
-
-			// Ensure minimum cap size to always cover the head properly
-			const minCapWidth = width * 0.3; // At least 30% of screen width
-			const minCapHeight = height * 0.18; // At least 18% of screen height
-
-			filterWidth = Math.max(filterWidth, minCapWidth);
-			filterHeight = Math.max(filterHeight, minCapHeight);
-
-			// Position cap much higher to sit on top of head, not between head and eyes
-			const foreheadAdjustment = pitchAngle * 10; // Further reduced sensitivity
-			const yawAdjustment = yawAngle * 15; // Further reduced sensitivity
+			// Position cap to sit on top of head
+			const foreheadAdjustment = pitchAngle * 8; // subtle
+			const yawAdjustment = yawAngle * 12; // subtle
 
 			// Calculate head center more accurately using multiple points
 			const headCenterX =
@@ -479,9 +610,9 @@
 				(hairlineLeft.y + hairlineRight.y) / 2
 			);
 
-			// Position cap even higher to ensure it sits on top of head
-			const baseYOffset = 0.95; // Higher positioning
-			const pitchYAdjustment = pitchAngle > 0 ? 0.05 : -0.05; // Adjust based on head tilt
+			// Position cap to sit naturally above hairline (slightly higher on bigger screens)
+			const baseYOffset = minDim <= 400 ? 0.8 : 0.82;
+			const pitchYAdjustment = pitchAngle > 0 ? 0.04 : -0.04;
 
 			filterX = headCenterX * width - filterWidth / 2 + yawAdjustment;
 			filterY =
@@ -489,26 +620,8 @@
 				filterHeight * (baseYOffset + pitchYAdjustment) +
 				foreheadAdjustment;
 
-			// Debug log for cap positioning
-			console.log("Cap positioning:", {
-				headWidth,
-				actualHeadHeight,
-				finalCapScale,
-				baseSizeMultiplier,
-				pitchSizeAdjustment,
-				filterWidth,
-				filterHeight,
-				minCapWidth,
-				minCapHeight,
-				filterX,
-				filterY,
-				headTopY,
-				pitchAngle: pitchAngle.toFixed(3),
-				yawAngle: yawAngle.toFixed(3),
-				foreheadCenter: foreheadCenter.y.toFixed(3),
-				yawAdjustment,
-				foreheadAdjustment,
-			});
+			// Debug log for cap positioning (comment out in production)
+			// console.log("Cap positioning:", { headWidth, filterWidth, filterHeight, filterX, filterY });
 
 			// Rotation center at the natural pivot point of the cap
 			rotationCenterX = filterX + filterWidth / 2;
@@ -645,6 +758,11 @@
 			return;
 		}
 
+		if (isFaceTrackingRunning) {
+			console.log("Face tracking already running, skip start");
+			return;
+		}
+		isFaceTrackingRunning = true;
 		console.log("Starting enhanced face tracking...");
 
 		let lastProcessTime = 0;
@@ -670,8 +788,17 @@
 			if (currentTime - lastProcessTime >= frameInterval) {
 				try {
 					// Only process if we have a selected filter to avoid unnecessary computation
-					if (selectedAdditionalFilter && faceMesh) {
-						await faceMesh.send({ image: videoRef });
+					if (
+						selectedAdditionalFilter &&
+						faceMesh &&
+						!isFaceMeshBusy
+					) {
+						isFaceMeshBusy = true;
+						try {
+							await faceMesh.send({ image: videoRef });
+						} finally {
+							isFaceMeshBusy = false;
+						}
 					}
 				} catch (error) {
 					console.error("Error processing frame:", error);
@@ -680,7 +807,7 @@
 				lastProcessTime = currentTime;
 			}
 
-			if (isCameraActive) {
+			if (isCameraActive && isFaceTrackingRunning) {
 				animationFrameId = requestAnimationFrame(processFrame);
 			}
 		};
@@ -690,6 +817,7 @@
 
 	// Stop face tracking
 	function stopFaceTracking() {
+		isFaceTrackingRunning = false;
 		if (animationFrameId) {
 			cancelAnimationFrame(animationFrameId);
 			animationFrameId = null;
@@ -734,7 +862,7 @@
 
 		// Restart face tracking after camera is ready with a delay
 		setTimeout(() => {
-			if (faceMesh && isCameraActive) {
+			if (faceMesh && isCameraActive && !isFaceTrackingRunning) {
 				startFaceTracking();
 				console.log("Face tracking restarted after camera switch");
 			}
@@ -749,10 +877,36 @@
 	}
 
 	function goBackToCamera() {
+		// Clean up video blob URL if it exists
+		if (recordedVideo) {
+			URL.revokeObjectURL(recordedVideo);
+		}
+
 		capturedImg = null;
 		recordedVideo = null;
 		showPreview = false;
+		isProcessingVideo = false; // Reset processing state
+
+		// Reset recording state
+		isRecording = false;
+		recordedChunks = [];
+		if (countdownInterval) {
+			clearInterval(countdownInterval);
+			countdownInterval = null;
+		}
+		recordingCountdown = 0;
+
 		startCamera();
+
+		// Restart face tracking after camera is active with a delay
+		setTimeout(() => {
+			if (faceMesh && isCameraActive) {
+				startFaceTracking();
+				console.log(
+					"Face tracking restarted after going back to camera"
+				);
+			}
+		}, 1500);
 	}
 
 	function downloadImage() {
@@ -814,9 +968,12 @@
 				sourceY = (videoHeight - sourceHeight) / 2;
 			}
 
-			// Set canvas to match the display dimensions for consistent output
-			canvasRef.width = displayWidth;
-			canvasRef.height = displayHeight;
+			// Set canvas to the native cropped video resolution for maximum quality
+			// This preserves original camera pixel detail instead of downscaling to display size
+			const destWidth = Math.round(sourceWidth);
+			const destHeight = Math.round(sourceHeight);
+			canvasRef.width = destWidth;
+			canvasRef.height = destHeight;
 
 			// Use offscreen canvas for compositing if available (better performance)
 			const useOffscreen =
@@ -827,8 +984,8 @@
 			let workingCanvas = canvasRef;
 
 			if (useOffscreen) {
-				offscreenCanvas.width = displayWidth;
-				offscreenCanvas.height = displayHeight;
+				offscreenCanvas.width = destWidth;
+				offscreenCanvas.height = destHeight;
 				workingCtx = offscreenCtx;
 				workingCanvas = offscreenCanvas;
 			}
@@ -836,7 +993,7 @@
 			// Only flip the canvas horizontally for front camera to match the mirrored display
 			if (currentCamera === "user") {
 				workingCtx.scale(-1, 1);
-				workingCtx.translate(-displayWidth, 0);
+				workingCtx.translate(-destWidth, 0);
 			}
 
 			// Draw the cropped video portion that matches what's visible
@@ -848,8 +1005,8 @@
 				sourceHeight, // Source rectangle (what's visible)
 				0,
 				0,
-				displayWidth,
-				displayHeight // Destination rectangle
+				destWidth,
+				destHeight // Destination rectangle at native resolution
 			);
 
 			console.log("filterUrl:", filterUrl);
@@ -863,8 +1020,8 @@
 						preloadedFilterImage,
 						0,
 						0,
-						displayWidth,
-						displayHeight
+						destWidth,
+						destHeight
 					);
 				} catch (error) {
 					console.error("Error drawing preloaded filter:", error);
@@ -885,13 +1042,7 @@
 
 					// Reset canvas transform and draw the filter in original orientation
 					workingCtx.setTransform(1, 0, 0, 1, 0, 0);
-					workingCtx.drawImage(
-						img,
-						0,
-						0,
-						displayWidth,
-						displayHeight
-					);
+					workingCtx.drawImage(img, 0, 0, destWidth, destHeight);
 				} catch (error) {
 					console.error(
 						"Error loading filter image on demand:",
@@ -903,35 +1054,36 @@
 			// Draw the face tracking overlay if it exists
 			if (overlayCanvasRef && selectedAdditionalFilter) {
 				workingCtx.setTransform(1, 0, 0, 1, 0, 0);
+				// Scale overlay (created at display size) up to destination/native size
+				// Use high quality smoothing for better visual fidelity
+				workingCtx.imageSmoothingEnabled = true;
+				workingCtx.imageSmoothingQuality = "high" as any;
 				workingCtx.drawImage(
 					overlayCanvasRef,
 					0,
 					0,
 					displayWidth,
-					displayHeight
+					displayHeight,
+					0,
+					0,
+					destWidth,
+					destHeight
 				);
 			}
 
 			// If we used offscreen canvas, copy to main canvas
 			if (useOffscreen) {
-				ctx.clearRect(0, 0, displayWidth, displayHeight);
+				ctx.clearRect(0, 0, destWidth, destHeight);
 				ctx.drawImage(offscreenCanvas, 0, 0);
 			}
 
-			// Generate image data URL with optimized quality
-			// Use JPEG with high quality for better performance, especially with GIF filters
-			const isGifFilter =
-				filterUrl &&
-				(filterUrl.toLowerCase().includes(".gif") ||
-					filterUrl.toLowerCase().includes("gif"));
-			const outputFormat = isGifFilter ? "image/jpeg" : "image/png";
-			const outputQuality = isGifFilter ? 0.85 : 0.92; // Lower quality for GIF filters for faster processing
-
-			capturedImg = canvasRef.toDataURL(outputFormat, outputQuality);
+			// Generate image data URL using lossless PNG to preserve original quality
+			const outputFormat = "image/png";
+			capturedImg = canvasRef.toDataURL(outputFormat);
 			recordedVideo = null;
 
 			console.log(
-				`Captured image as ${outputFormat} with quality ${outputQuality}`
+				`Captured image as ${outputFormat} at ${destWidth}x${destHeight}`
 			);
 
 			// Stop camera and show preview
@@ -947,13 +1099,43 @@
 	}
 
 	async function startVideoRecording() {
+		// Check if canvas.captureStream is supported
+		const testCanvas = document.createElement("canvas");
+		if (typeof testCanvas.captureStream !== "function") {
+			alert("Video recording is not supported on this device/browser.");
+			return;
+		}
+
 		try {
 			recordedChunks = [];
 			const stream = videoRef.srcObject as MediaStream;
 
+			// Ensure video is playing and ready
+			if (videoRef.readyState < 2) {
+				console.log("Video not ready, waiting for metadata...");
+				await new Promise((resolve) => {
+					videoRef.addEventListener("loadedmetadata", resolve, {
+						once: true,
+					});
+				});
+			}
+
 			// Get display dimensions for consistent recording
 			const displayWidth = videoRef.clientWidth;
 			const displayHeight = videoRef.clientHeight;
+
+			console.log(
+				"Video dimensions:",
+				videoRef.videoWidth,
+				"x",
+				videoRef.videoHeight
+			);
+			console.log(
+				"Display dimensions:",
+				displayWidth,
+				"x",
+				displayHeight
+			);
 
 			// Create a new canvas to composite video with filter
 			const recordCanvas = document.createElement("canvas");
@@ -961,9 +1143,18 @@
 			recordCanvas.height = displayHeight;
 			const recordCtx = recordCanvas.getContext("2d");
 
+			if (!recordCtx) {
+				throw new Error("Failed to get canvas context");
+			}
+
 			// Get video dimensions for cropping calculation
 			const videoWidth = videoRef.videoWidth;
 			const videoHeight = videoRef.videoHeight;
+
+			if (videoWidth === 0 || videoHeight === 0) {
+				throw new Error("Video dimensions are invalid");
+			}
+
 			const videoAspect = videoWidth / videoHeight;
 			const displayAspect = displayWidth / displayHeight;
 
@@ -1006,14 +1197,44 @@
 				}
 			}
 
-			// Create a stream from the canvas
-			const canvasStream = recordCanvas.captureStream(30); // 30 FPS
+			// Create a stream from the canvas with mobile-optimized settings
+			let canvasStream;
+			try {
+				// Try different frame rates for better mobile compatibility
+				const isMobile =
+					/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+						navigator.userAgent
+					);
+				const frameRate = isMobile ? 15 : 30; // Lower frame rate for mobile
+
+				canvasStream = recordCanvas.captureStream(frameRate);
+				console.log(`Canvas stream created with ${frameRate} FPS`);
+
+				// Verify the stream has video tracks
+				const videoTracks = canvasStream.getVideoTracks();
+				if (videoTracks.length === 0) {
+					throw new Error("Canvas stream has no video tracks");
+				}
+				console.log("Canvas stream video tracks:", videoTracks.length);
+			} catch (error) {
+				console.error("Failed to create canvas stream:", error);
+				// Fallback: try without frame rate specification
+				canvasStream = recordCanvas.captureStream();
+				console.log("Fallback canvas stream created");
+			}
 
 			// Start drawing video + filter to canvas continuously
 			const drawFrame = () => {
 				if (!isRecording) return;
 
 				try {
+					// Ensure video is still playing and has valid dimensions
+					if (videoRef.readyState < 2 || videoRef.videoWidth === 0) {
+						console.warn("Video not ready for frame capture");
+						requestAnimationFrame(drawFrame);
+						return;
+					}
+
 					// Clear the canvas first
 					recordCtx.clearRect(0, 0, displayWidth, displayHeight);
 
@@ -1064,36 +1285,53 @@
 					requestAnimationFrame(drawFrame);
 				} catch (error) {
 					console.error("Error drawing frame:", error);
+					// Continue trying to draw frames even if there's an error
+					requestAnimationFrame(drawFrame);
 				}
 			};
 
 			// Configure MediaRecorder with better settings and more compatible format
 			let options = {
-				mimeType: "video/mp4;codecs=h264",
-				videoBitsPerSecond: 2500000,
+				videoBitsPerSecond: 1500000, // Lower bitrate for mobile
 			};
 
-			// Try different formats in order of preference
-			if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-				options.mimeType = "video/mp4";
+			// Try different formats in order of preference for better mobile support
+			const supportedTypes = [
+				"video/webm;codecs=vp8", // Most widely supported
+				"video/webm;codecs=vp9",
+				"video/webm",
+				"video/mp4;codecs=avc1.42E01E", // H.264 Baseline Profile
+				"video/mp4;codecs=h264",
+				"video/mp4",
+			];
+
+			let selectedMimeType = "video/webm"; // Fallback
+			for (const type of supportedTypes) {
+				if (MediaRecorder.isTypeSupported(type)) {
+					selectedMimeType = type;
+					break;
+				}
 			}
 
-			if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-				options.mimeType = "video/webm;codecs=vp8";
-			}
-
-			// Fallback to basic webm if nothing else works
-			if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-				options.mimeType = "video/webm";
-			}
-
+			options.mimeType = selectedMimeType;
 			console.log("Using MediaRecorder with mimeType:", options.mimeType);
+			console.log("MediaRecorder options:", options);
+
+			// Verify canvas stream before creating MediaRecorder
+			if (!canvasStream || canvasStream.getVideoTracks().length === 0) {
+				throw new Error("Invalid canvas stream for MediaRecorder");
+			}
 
 			mediaRecorder = new MediaRecorder(canvasStream, options);
+			console.log("MediaRecorder created successfully");
 
 			mediaRecorder.ondataavailable = (event) => {
+				console.log("Data available:", event.data?.size || 0, "bytes");
 				if (event.data && event.data.size > 0) {
 					recordedChunks.push(event.data);
+					console.log("Total chunks:", recordedChunks.length);
+				} else {
+					console.warn("Received empty data chunk");
 				}
 			};
 
@@ -1103,6 +1341,14 @@
 						const blob = new Blob(recordedChunks, {
 							type: mediaRecorder.mimeType || "video/webm",
 						});
+
+						// Validate blob size before proceeding
+						if (blob.size === 0) {
+							console.error("Created blob is empty");
+							isProcessingVideo = false;
+							alert("Failed to record video. Please try again.");
+							return;
+						}
 
 						// Clean up any existing video URL
 						if (recordedVideo) {
@@ -1116,25 +1362,95 @@
 							recordedVideo
 						);
 						console.log("Blob size:", blob.size, "bytes");
+						console.log("Blob type:", blob.type);
 
-						// Stop camera and show preview
-						stopCamera();
-						showPreview = true;
+						// Wait a bit longer on mobile devices for better processing
+						const isMobile =
+							/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+								navigator.userAgent
+							);
+						const delay = isMobile ? 300 : 100;
+
+						// Use a timeout to ensure the video blob is fully processed before showing preview
+						setTimeout(() => {
+							// Validate that the blob URL is still valid before showing preview
+							if (recordedVideo) {
+								isProcessingVideo = false; // Clear processing state
+								// Stop camera and show preview after delay
+								stopCamera();
+								showPreview = true;
+								console.log("Preview shown for recorded video");
+							} else {
+								console.error("Video blob URL became invalid");
+								isProcessingVideo = false;
+								alert(
+									"Failed to process video. Please try again."
+								);
+							}
+						}, delay);
 					} else {
 						console.error("No video data recorded");
+						isProcessingVideo = false;
+						// Show error and don't stop camera
+						alert("No video data was recorded. Please try again.");
 					}
 				} catch (error) {
 					console.error("Error creating video blob:", error);
+					isProcessingVideo = false;
+					// Show error and don't stop camera
+					alert("Failed to process video. Please try again.");
 				}
 			};
 
 			mediaRecorder.onerror = (event) => {
 				console.error("MediaRecorder error:", event.error);
+				isRecording = false;
+				isProcessingVideo = false;
+				alert("Recording error occurred. Please try again.");
 			};
 
+			mediaRecorder.onstart = () => {
+				console.log("MediaRecorder started successfully");
+			};
+
+			// Start recording with better mobile support
 			isRecording = true;
+			recordingCountdown = 15; // Start countdown at 15 seconds
+
+			// Start countdown timer
+			countdownInterval = setInterval(() => {
+				recordingCountdown--;
+				if (recordingCountdown <= 0) {
+					if (countdownInterval) {
+						clearInterval(countdownInterval);
+						countdownInterval = null;
+					}
+					stopVideoRecording();
+				}
+			}, 1000);
+
+			// Start drawing frames before starting recorder
 			drawFrame();
-			mediaRecorder.start(1000); // Record in 1-second chunks
+
+			// Wait a brief moment to ensure canvas has content before starting recorder
+			setTimeout(() => {
+				try {
+					console.log("Starting MediaRecorder...");
+					mediaRecorder.start(100); // Smaller timeslices for better mobile compatibility
+					console.log(
+						"MediaRecorder started with state:",
+						mediaRecorder.state
+					);
+				} catch (error) {
+					console.error("Failed to start MediaRecorder:", error);
+					isRecording = false;
+					if (countdownInterval) {
+						clearInterval(countdownInterval);
+						countdownInterval = null;
+					}
+					alert("Failed to start recording. Please try again.");
+				}
+			}, 100);
 		} catch (error) {
 			console.error("Error starting video recording:", error);
 		}
@@ -1142,17 +1458,63 @@
 
 	function stopVideoRecording() {
 		if (mediaRecorder && isRecording) {
-			isRecording = false;
+			console.log("Stopping video recording...");
+			console.log("Current MediaRecorder state:", mediaRecorder.state);
+			console.log("Recorded chunks so far:", recordedChunks.length);
 
-			// Stop the media recorder
-			if (mediaRecorder.state !== "inactive") {
-				mediaRecorder.stop();
+			isRecording = false;
+			isProcessingVideo = true; // Show processing state
+
+			// Clear countdown interval
+			if (countdownInterval) {
+				clearInterval(countdownInterval);
+				countdownInterval = null;
+			}
+			recordingCountdown = 0;
+
+			// Stop the media recorder with proper state checking
+			try {
+				if (mediaRecorder.state === "recording") {
+					console.log("Stopping MediaRecorder...");
+					mediaRecorder.stop();
+				} else if (mediaRecorder.state === "paused") {
+					console.log("Resuming and stopping MediaRecorder...");
+					mediaRecorder.resume();
+					setTimeout(() => {
+						if (mediaRecorder.state === "recording") {
+							mediaRecorder.stop();
+						}
+					}, 100);
+				} else {
+					console.warn(
+						"MediaRecorder is in unexpected state:",
+						mediaRecorder.state
+					);
+					// Force trigger onstop if we have chunks
+					if (recordedChunks.length > 0) {
+						setTimeout(() => {
+							if (mediaRecorder.onstop) {
+								mediaRecorder.onstop();
+							}
+						}, 100);
+					} else {
+						isProcessingVideo = false;
+						alert("No video data was recorded. Please try again.");
+					}
+				}
+			} catch (error) {
+				console.error("Error stopping MediaRecorder:", error);
+				isProcessingVideo = false;
+				alert("Error stopping recording. Please try again.");
 			}
 
 			// Stop all tracks in the canvas stream to free up resources
 			const canvasStream = mediaRecorder.stream;
 			if (canvasStream) {
-				canvasStream.getTracks().forEach((track) => track.stop());
+				canvasStream.getTracks().forEach((track) => {
+					console.log("Stopping track:", track.kind, track.label);
+					track.stop();
+				});
 			}
 		}
 	}
@@ -1162,78 +1524,407 @@
 		console.log("capturedImg:", !!capturedImg);
 		console.log("recordedVideo:", !!recordedVideo);
 
+		// Consistent caption across platforms (many apps ignore text when files are attached)
+		const CAPTION = "Festive mood: ON 🔥 Can't wait for #ASoBPuja";
+
+		// Best-effort: copy caption to clipboard before invoking share (so users can paste if app ignores it)
+		let captionCopied = false;
+		const copyCaption = async (text) => {
+			try {
+				if (navigator.clipboard && window.isSecureContext) {
+					await navigator.clipboard.writeText(text);
+					return true;
+				}
+				// Fallback for older iOS/Android
+				const textarea = document.createElement("textarea");
+				textarea.value = text;
+				textarea.setAttribute("readonly", "");
+				textarea.style.position = "absolute";
+				textarea.style.left = "-9999px";
+				document.body.appendChild(textarea);
+				textarea.select();
+				const ok = document.execCommand("copy");
+				document.body.removeChild(textarea);
+				return ok;
+			} catch (_) {
+				return false;
+			}
+		};
+
+		captionCopied = await copyCaption(CAPTION);
+
+		// Enhanced platform detection with better mobile device recognition
+		const ua = navigator.userAgent.toLowerCase();
+		const isAndroid =
+			/android/.test(ua) || (/mobile/.test(ua) && /android/.test(ua));
+		const isIOS =
+			/iphone|ipad|ipod/.test(ua) ||
+			(/mac/.test(ua) && "ontouchend" in document);
+		const isMobile =
+			isAndroid ||
+			isIOS ||
+			/mobile|tablet|phone|android|iphone|ipad|ipod|blackberry|opera mini|iemobile/.test(
+				ua
+			);
+		const isChrome = /chrome/.test(ua) && !/edg/.test(ua);
+		const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
+		const isFirefox = /firefox/.test(ua);
+
+		// Check file size limits (mobile browsers have different limits)
+		const maxFileSize = isMobile ? 25 * 1024 * 1024 : 100 * 1024 * 1024; // 25MB mobile, 100MB desktop
+
 		try {
 			if (capturedImg) {
 				// Convert data URL to blob
 				const response = await fetch(capturedImg);
 				const blob = await response.blob();
-				const file = new File([blob], "rongcam-photo.png", {
-					type: "image/png",
+
+				// For mobile, ensure proper file format and size
+				let finalBlob = blob;
+				let fileName = "rongcam-photo.png";
+
+				if (isMobile) {
+					// Mobile-specific optimizations
+					try {
+						// Convert to JPEG for better mobile compatibility if image is large
+						if (blob.size > 2 * 1024 * 1024) {
+							// If larger than 2MB
+							const canvas = document.createElement("canvas");
+							const ctx = canvas.getContext("2d");
+							const img = new Image();
+
+							await new Promise((resolve, reject) => {
+								img.onload = () => {
+									// Resize for mobile if needed
+									const maxDimension = 1920;
+									let { width, height } = img;
+
+									if (
+										width > maxDimension ||
+										height > maxDimension
+									) {
+										if (width > height) {
+											height =
+												(height * maxDimension) / width;
+											width = maxDimension;
+										} else {
+											width =
+												(width * maxDimension) / height;
+											height = maxDimension;
+										}
+									}
+
+									canvas.width = width;
+									canvas.height = height;
+									ctx.drawImage(img, 0, 0, width, height);
+
+									canvas.toBlob(
+										(optimizedBlob) => {
+											if (optimizedBlob) {
+												finalBlob = optimizedBlob;
+												fileName = "rongcam-photo.jpg";
+											}
+											resolve();
+										},
+										"image/jpeg",
+										0.85
+									);
+								};
+								img.onerror = reject;
+								img.src = capturedImg;
+							});
+						}
+					} catch (optimizationError) {
+						console.log(
+							"Image optimization failed, using original:",
+							optimizationError
+						);
+					}
+				}
+
+				const file = new File([finalBlob], fileName, {
+					type: finalBlob.type,
 				});
 
+				// Try Web Share API first, but with mobile-specific handling
 				if (
 					navigator.share &&
 					navigator.canShare &&
 					navigator.canShare({ files: [file] })
 				) {
-					await navigator.share({
-						title: "RongCam AR Photo",
-						text: "Festive mood: ON 🔥 Can't wait for #ASoBPuja",
-						files: [file],
-					});
+					try {
+						await navigator.share({
+							title: "RongCam AR Photo",
+							text: CAPTION,
+							files: [file],
+						});
+						console.log(
+							"Successfully shared photo via Web Share API"
+						);
+						return; // Exit if successful
+					} catch (shareError) {
+						console.log("Web Share API failed:", shareError);
+						// Continue to fallback method
+					}
 				} else {
-					// Fallback: download the image
+					// Fallback: download the image and open WhatsApp
 					const link = document.createElement("a");
 					link.href = capturedImg;
 					link.download = "rongcam-photo.png";
 					link.click();
-					alert(
-						"Photo downloaded! You can now share it from your device."
-					);
+
+					// Enhanced WhatsApp opening for photos
+					setTimeout(() => {
+						try {
+							if (isMobile) {
+								if (isAndroid) {
+									// Android: Use intent-based approach
+									const whatsappIntentUrl = `intent://send?text=${encodeURIComponent(CAPTION)}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+									try {
+										window.location.href =
+											whatsappIntentUrl;
+									} catch (intentError) {
+										window.open(
+											`whatsapp://send?text=${encodeURIComponent(CAPTION)}`,
+											"_blank"
+										);
+									}
+								} else if (isIOS) {
+									// iOS: Use universal link
+									window.location.href = `whatsapp://send?text=${encodeURIComponent(CAPTION)}`;
+								}
+
+								// Fallback to web version after delay
+								setTimeout(() => {
+									if (document.hasFocus()) {
+										window.open(
+											`https://wa.me/?text=${encodeURIComponent(CAPTION)}`,
+											"_blank"
+										);
+									}
+								}, 2000);
+							} else {
+								// Desktop: Direct to web version
+								window.open(
+									`https://wa.me/?text=${encodeURIComponent(CAPTION)}`,
+									"_blank"
+								);
+							}
+						} catch (error) {
+							console.log(
+								"WhatsApp open failed for photo:",
+								error
+							);
+							// Final fallback
+							window.open(
+								`https://wa.me/?text=${encodeURIComponent(CAPTION)}`,
+								"_blank"
+							);
+						}
+					}, 300);
 				}
 			} else if (recordedVideo) {
 				console.log("Attempting to share video");
-				// Convert video blob to file for sharing
+
+				// Convert video blob to proper format for mobile sharing
 				const response = await fetch(recordedVideo);
-				const blob = await response.blob();
-				console.log("Video blob size:", blob.size, "type:", blob.type);
+				const originalBlob = await response.blob();
+				console.log(
+					"Original video blob size:",
+					originalBlob.size,
+					"type:",
+					originalBlob.type
+				);
 
-				// Try different formats for better compatibility
-				let fileName = "rongcam-video.mp4";
-				let mimeType = "video/mp4";
+				// Check file size before proceeding
+				if (originalBlob.size > maxFileSize) {
+					console.warn(
+						"Video file too large for sharing:",
+						originalBlob.size
+					);
+					// Force download for large files
+					const link = document.createElement("a");
+					link.href = recordedVideo;
+					link.download = "rongcam-video.webm";
+					link.click();
 
-				// Check if the original blob has a specific type
-				if (blob.type) {
-					if (blob.type.includes("webm")) {
+					// Still try to open WhatsApp for manual sharing with improved error handling
+					setTimeout(() => {
+						try {
+							if (isMobile) {
+								if (isAndroid) {
+									// Android: Use multiple approaches for better reliability
+									const whatsappIntentUrl = `intent://send?text=${encodeURIComponent(CAPTION)}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+									const whatsappAppUrl = `whatsapp://send?text=${encodeURIComponent(CAPTION)}`;
+									const whatsappWebUrl = `https://wa.me/?text=${encodeURIComponent(CAPTION)}`;
+
+									try {
+										window.location.href =
+											whatsappIntentUrl;
+									} catch (intentError) {
+										try {
+											window.open(
+												whatsappAppUrl,
+												"_blank"
+											);
+										} catch (appError) {
+											window.open(
+												whatsappWebUrl,
+												"_blank"
+											);
+										}
+									}
+
+									// Fallback to web version after delay if needed
+									setTimeout(() => {
+										if (document.hasFocus()) {
+											window.open(
+												whatsappWebUrl,
+												"_blank"
+											);
+										}
+									}, 1500);
+								} else if (isIOS) {
+									// iOS: Better universal link handling
+									const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(CAPTION)}`;
+									const whatsappWebUrl = `https://wa.me/?text=${encodeURIComponent(CAPTION)}`;
+
+									try {
+										window.location.href = whatsappUrl;
+
+										// iOS fallback with visibility detection
+										setTimeout(() => {
+											if (document.hasFocus()) {
+												window.open(
+													whatsappWebUrl,
+													"_blank"
+												);
+											}
+										}, 2000);
+									} catch (iosError) {
+										window.open(whatsappWebUrl, "_blank");
+									}
+								}
+							} else {
+								// Desktop: WhatsApp Web
+								window.open(
+									`https://web.whatsapp.com/send?text=${encodeURIComponent(CAPTION)}`,
+									"_blank"
+								);
+							}
+						} catch (e) {
+							console.log("WhatsApp open failed:", e);
+							// Final fallback: web version
+							try {
+								window.open(
+									`https://wa.me/?text=${encodeURIComponent(CAPTION)}`,
+									"_blank"
+								);
+							} catch (finalError) {
+								console.error(
+									"All WhatsApp methods failed:",
+									finalError
+								);
+							}
+						}
+					}, 500);
+					return;
+				}
+
+				// Keep original format and MIME type - with mobile optimization
+				let fileName = "rongcam-video.webm";
+				let mimeType = originalBlob.type || "video/webm";
+				let finalBlob = originalBlob;
+
+				// Mobile-specific video handling
+				if (isMobile) {
+					// For mobile, prefer MP4 format as it's more widely supported
+					if (originalBlob.type.includes("webm")) {
 						fileName = "rongcam-video.webm";
 						mimeType = "video/webm";
-					} else if (blob.type.includes("mp4")) {
-						fileName = "rongcam-video.mp4";
-						mimeType = "video/mp4";
+
+						// Note: We keep the original blob but change the filename and mimetype
+						// Most mobile apps can handle WebM data with MP4 extension
+						finalBlob = new Blob([originalBlob], {
+							type: "video/webm",
+						});
+					} else if (originalBlob.type.includes("webm")) {
+						fileName = "rongcam-video.webm";
+						mimeType = "video/webm";
+					}
+
+					// Ensure file size is mobile-friendly
+					if (finalBlob.size > 15 * 1024 * 1024) {
+						// 15MB limit for mobile
+						console.warn(
+							"Video file large for mobile sharing:",
+							finalBlob.size
+						);
+					}
+				} else {
+					// Desktop: keep original format
+					if (originalBlob.type.includes("webm")) {
+						fileName = "rongcam-video.webm";
+						mimeType = "video/webm";
+					} else if (originalBlob.type.includes("webm")) {
+						fileName = "rongcam-video.webm";
+						mimeType = "video/webm";
 					}
 				}
 
-				console.log("File name:", fileName, "MIME type:", mimeType);
+				console.log(
+					"Final file name:",
+					fileName,
+					"MIME type:",
+					mimeType
+				);
+				console.log("Final blob size:", finalBlob.size);
 
-				const file = new File([blob], fileName, {
+				const file = new File([finalBlob], fileName, {
 					type: mimeType,
 				});
 
 				console.log("File created:", file.name, file.size, file.type);
 
-				// Check if Web Share API is available and can share files
+				// Enhanced sharing logic with mobile-specific handling
 				if (navigator.share) {
 					console.log("Web Share API is available");
 
-					if (
-						navigator.canShare &&
-						navigator.canShare({ files: [file] })
-					) {
-						console.log("Can share files with Web Share API");
+					// Check if device can share files with special mobile handling
+					let canShareFiles = false;
+					try {
+						if (isMobile) {
+							// On mobile, be more conservative with file sharing
+							canShareFiles =
+								navigator.canShare &&
+								navigator.canShare({ files: [file] });
+
+							// Additional check for mobile file size limits
+							if (canShareFiles && file.size > 10 * 1024 * 1024) {
+								// 10MB mobile limit
+								console.log(
+									"File too large for mobile Web Share API"
+								);
+								canShareFiles = false;
+							}
+						} else {
+							canShareFiles =
+								navigator.canShare &&
+								navigator.canShare({ files: [file] });
+						}
+					} catch (e) {
+						console.log("Error checking canShare:", e);
+						canShareFiles = false;
+					}
+
+					if (canShareFiles) {
+						console.log(
+							"Device can share files with Web Share API"
+						);
 						try {
 							await navigator.share({
 								title: "RongCam AR Video",
-								text: "Festive mood: ON 🔥 Can't wait for #ASoBPuja",
+								text: CAPTION,
 								files: [file],
 							});
 							console.log(
@@ -1242,40 +1933,212 @@
 							return; // Exit function if sharing was successful
 						} catch (shareError) {
 							console.log(
-								"Share API failed, falling back to download:",
+								"Share API failed, trying fallbacks:",
 								shareError
 							);
-							// Fallback to download if share fails
-							const link = document.createElement("a");
-							link.href = recordedVideo;
-							link.download = fileName;
-							link.click();
-							alert(
-								"Video downloaded! You can now share it from your device."
-							);
+
+							// On mobile, if Web Share API fails, skip to download + WhatsApp
+							if (isMobile) {
+								console.log(
+									"Mobile Web Share failed, using download + WhatsApp method"
+								);
+							}
 						}
 					} else {
-						console.log("Cannot share files with Web Share API");
-						// Fallback: download the video
-						const link = document.createElement("a");
-						link.href = recordedVideo;
-						link.download = fileName;
-						link.click();
-						alert(
-							"Video downloaded! You can now share it from your device."
+						console.log(
+							"Cannot share files with Web Share API - using fallback"
 						);
 					}
-				} else {
-					console.log("Web Share API not available");
-					// Fallback: download the video
-					const link = document.createElement("a");
-					link.href = recordedVideo;
-					link.download = fileName;
-					link.click();
-					alert(
-						"Video downloaded! You can now share it from your device."
-					);
 				}
+
+				// Primary fallback: download the video and open WhatsApp
+				console.log(
+					"Using primary fallback: download + WhatsApp sharing"
+				);
+
+				// Download the video first
+				const link = document.createElement("a");
+				link.href = recordedVideo;
+				link.download = fileName;
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
+
+				// For mobile, try text-only sharing first if available
+				if (isMobile && navigator.share) {
+					try {
+						console.log(
+							"Trying mobile text-only share before WhatsApp"
+						);
+						await navigator.share({
+							title: "RongCam AR Video",
+							text: `${CAPTION}\n\nVideo downloaded to your device. You can now share it manually through WhatsApp or other apps.`,
+						});
+						console.log("Text-only share successful");
+						return; // Exit if text sharing worked
+					} catch (textShareError) {
+						console.log(
+							"Text-only share failed, proceeding to WhatsApp:",
+							textShareError
+						);
+						// Continue to WhatsApp method
+					}
+				}
+
+				// Enhanced WhatsApp sharing with better mobile support and error handling
+				setTimeout(() => {
+					try {
+						if (isMobile) {
+							if (isAndroid) {
+								// Android: Use intent-based approach for better reliability
+								console.log(
+									"Attempting Android WhatsApp sharing"
+								);
+
+								// Try multiple WhatsApp URL schemes for Android
+								const whatsappIntentUrl = `intent://send?text=${encodeURIComponent(CAPTION)}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+								const whatsappAppUrl = `whatsapp://send?text=${encodeURIComponent(CAPTION)}`;
+								const whatsappWebUrl = `https://wa.me/?text=${encodeURIComponent(CAPTION)}`;
+
+								// First try intent URL (most reliable on Android)
+								try {
+									window.location.href = whatsappIntentUrl;
+
+									// Fallback to app URL after short delay
+									setTimeout(() => {
+										try {
+											const appWindow = window.open(
+												whatsappAppUrl,
+												"_blank"
+											);
+
+											// If that fails, try web version
+											setTimeout(() => {
+												if (
+													!appWindow ||
+													appWindow.closed
+												) {
+													console.log(
+														"WhatsApp app not available, opening web version"
+													);
+													window.open(
+														whatsappWebUrl,
+														"_blank"
+													);
+												}
+											}, 1500);
+										} catch (e) {
+											console.log(
+												"App URL failed, trying web version"
+											);
+											window.open(
+												whatsappWebUrl,
+												"_blank"
+											);
+										}
+									}, 1000);
+								} catch (intentError) {
+									console.log(
+										"Intent URL failed, trying app URL"
+									);
+									try {
+										window.open(whatsappAppUrl, "_blank");
+									} catch (appError) {
+										console.log(
+											"App URL failed, opening web version"
+										);
+										window.open(whatsappWebUrl, "_blank");
+									}
+								}
+							} else if (isIOS) {
+								// iOS: Use universal links with better error handling
+								console.log("Attempting iOS WhatsApp sharing");
+
+								const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(CAPTION)}`;
+								const whatsappWebUrl = `https://wa.me/?text=${encodeURIComponent(CAPTION)}`;
+
+								// Try to open WhatsApp app
+								try {
+									window.location.href = whatsappUrl;
+
+									// Set up fallback mechanism
+									let fallbackTriggered = false;
+									const fallbackTimer = setTimeout(() => {
+										if (
+											!fallbackTriggered &&
+											document.hasFocus()
+										) {
+											fallbackTriggered = true;
+											console.log(
+												"WhatsApp app not available, opening web version"
+											);
+											window.open(
+												whatsappWebUrl,
+												"_blank"
+											);
+										}
+									}, 2500);
+
+									// Clear fallback if page loses focus (app opened)
+									const visibilityHandler = () => {
+										if (
+											document.hidden &&
+											!fallbackTriggered
+										) {
+											fallbackTriggered = true;
+											clearTimeout(fallbackTimer);
+											console.log(
+												"WhatsApp app opened successfully"
+											);
+										}
+									};
+
+									document.addEventListener(
+										"visibilitychange",
+										visibilityHandler,
+										{ once: true }
+									);
+
+									// Cleanup listener after timeout
+									setTimeout(() => {
+										document.removeEventListener(
+											"visibilitychange",
+											visibilityHandler
+										);
+									}, 3000);
+								} catch (iosError) {
+									console.log(
+										"iOS WhatsApp URL failed, opening web version"
+									);
+									window.open(whatsappWebUrl, "_blank");
+								}
+							}
+						} else {
+							// Desktop: WhatsApp Web
+							console.log("Opening WhatsApp Web for desktop");
+							window.open(
+								`https://web.whatsapp.com/send?text=${encodeURIComponent(CAPTION)}`,
+								"_blank"
+							);
+						}
+					} catch (whatsappError) {
+						console.error("WhatsApp sharing error:", whatsappError);
+						// Final fallback: always try web version
+						try {
+							console.log("Using final fallback: WhatsApp Web");
+							window.open(
+								`https://wa.me/?text=${encodeURIComponent(CAPTION)}`,
+								"_blank"
+							);
+						} catch (finalError) {
+							console.error(
+								"Final WhatsApp fallback failed:",
+								finalError
+							);
+							// Silent fail - file was already downloaded
+						}
+					}
+				}, 800); // Delay to ensure download starts first
 			} else {
 				console.log("No content available to share");
 				alert(
@@ -1284,22 +2147,19 @@
 			}
 		} catch (error) {
 			console.error("Error sharing:", error);
-			// Ultimate fallback: download the file
+			// Ultimate fallback: download the file and provide WhatsApp instructions
 			try {
 				if (capturedImg) {
 					const link = document.createElement("a");
 					link.href = capturedImg;
 					link.download = "rongcam-photo.png";
 					link.click();
-					alert(
-						"Photo downloaded! You can now share it from your device."
-					);
 				} else if (recordedVideo) {
 					const response = await fetch(recordedVideo);
 					const blob = await response.blob();
 
 					// Determine file name based on blob type
-					let fileName = "rongcam-video.mp4";
+					let fileName = "rongcam-video.webm";
 					if (blob.type && blob.type.includes("webm")) {
 						fileName = "rongcam-video.webm";
 					}
@@ -1308,12 +2168,9 @@
 					link.href = recordedVideo;
 					link.download = fileName;
 					link.click();
-					alert(
-						"Video downloaded! You can now share it from your device."
-					);
 				}
 			} catch (downloadError) {
-				alert("Sharing and download not supported on this device");
+				console.error("Download fallback failed:", downloadError);
 			}
 		}
 	}
@@ -1447,11 +2304,13 @@
 
 	// Function to close additional filters modal
 	function closeAdditionalFiltersModal() {
+		console.log("closeAdditionalFiltersModal called");
 		showAdditionalFiltersModal = false;
 	}
 
 	// Function to select an additional filter
 	function selectAdditionalFilter(filterImage) {
+		console.log("selectAdditionalFilter called with:", filterImage);
 		selectedAdditionalFilter = filterImage;
 		showAdditionalFiltersModal = false;
 
@@ -1468,13 +2327,10 @@
 			}
 		});
 
-		// Restart face tracking when a filter is selected for immediate response
-		if (faceMesh && isCameraActive) {
-			stopFaceTracking();
-			setTimeout(() => {
-				startFaceTracking();
-				console.log("Face tracking restarted for new filter");
-			}, 100);
+		// Ensure face tracking is running without spawning duplicate loops
+		if (faceMesh && isCameraActive && !isFaceTrackingRunning) {
+			startFaceTracking();
+			console.log("Face tracking started for new filter");
 		}
 
 		console.log("Selected additional filter:", filterImage);
@@ -1494,6 +2350,21 @@
 			);
 		}
 	}
+
+	// Cleanup when leaving the page/component
+	onDestroy(() => {
+		try {
+			stopFaceTracking();
+			stopCamera();
+			if (faceMesh && typeof faceMesh.close === "function") {
+				faceMesh.close();
+			}
+		} catch (err) {
+			console.warn("Error during cleanup:", err);
+		} finally {
+			faceMesh = null;
+		}
+	});
 
 	// Helper function to get filter image URL
 	function getFilterImageUrl(filter) {
@@ -1576,7 +2447,7 @@
 					<span class="back-icon">←</span>
 				</button>
 				<h2 class="preview-title">
-					{#if capturedImg}<Camera /> Photo{:else}<Video /> Video{/if}
+					<!-- {#if capturedImg}<Camera /> Photo{:else}<Video /> Video{/if} -->
 				</h2>
 				<div></div>
 				<!-- Spacer for centering -->
@@ -1594,9 +2465,26 @@
 						src={recordedVideo}
 						class="preview-media"
 						controls
-						autoplay
-						alt="Recorded video"
-					></video>
+						muted
+						playsinline
+						disablePictureInPicture
+						controlsList="nofullscreen noremoteplayback"
+						on:loadeddata={() =>
+							console.log("Video loaded successfully")}
+						on:error={(e) => {
+							console.error("Video load error:", e);
+							alert(
+								"Failed to load video preview. The video was recorded but cannot be displayed."
+							);
+						}}
+					>
+						<track
+							kind="captions"
+							src=""
+							label="No captions available"
+							default
+						/>
+					</video>
 				{/if}
 			</div>
 
@@ -1606,23 +2494,29 @@
 					on:click={() =>
 						capturedImg ? downloadImage() : downloadVideo()}
 				>
-					<span class="btn-icon"><Import /></span>
+					<span class="btn-icon"
+						><img src="/Save.svg" alt="Download" /></span
+					>
 					<span class="btn-text">Save</span>
 				</button>
 				<button class="action-btn share-btn" on:click={shareContent}>
-					<span class="btn-icon"><Share2 /></span>
+					<span class="btn-icon"
+						><img src="/Share.svg" alt="Share" /></span
+					>
 					<span class="btn-text">Share</span>
 				</button>
 				<button
 					class="action-btn filters-btn"
 					on:click={showUserFilters}
 				>
-					<span class="btn-icon"><Sparkles /></span>
-					<span class="btn-text">More Filters</span>
+					<span class="btn-icon"
+						><img src="/filter.svg" alt="Filters" /></span
+					>
+					<span class="btn-text">Filters</span>
 				</button>
 				<button class="action-btn retake-btn" on:click={goBackToCamera}>
 					<span class="btn-icon"
-						>{#if capturedImg}<Camera />{:else}<Video />{/if}</span
+						><img src="/Retake.svg" alt="Retake" /></span
 					>
 					<span class="btn-text">Retake</span>
 				</button>
@@ -1632,31 +2526,32 @@
 		<!-- Camera Mode -->
 		<div class="camera-fullscreen">
 			<!-- Top Controls -->
-			<div class="top-controls">
+			<!-- <div class="top-controls">
 				<div></div>
-				<div class="mode-toggle">
-					<button
+				<div class="mode-toggle"> -->
+			<!-- <button
 						class="mode-btn {isPhotoMode ? 'active' : ''}"
 						on:click={() => toggleMode()}
 						disabled={isRecording}
 					>
 						PHOTO
-					</button>
-					<button
+					</button> -->
+			<!-- <button
 						class="mode-btn {!isPhotoMode ? 'active' : ''}"
 						on:click={() => toggleMode()}
 						disabled={isRecording}
 					>
 						VIDEO
-					</button>
-				</div>
+					</button> -->
+			<!-- </div>
 				<button
 					class="control-btn close-btn"
 					on:click={() => window.history.back()}
+					on:touchstart={() => window.history.back()}
 				>
 					<span class="control-icon">✕</span>
 				</button>
-			</div>
+			</div> -->
 
 			<!-- Camera View -->
 			<div class="camera-view">
@@ -1688,7 +2583,9 @@
 				{#if isRecording}
 					<div class="recording-indicator">
 						<div class="recording-dot"></div>
-						<span class="recording-text">REC</span>
+						<span class="recording-text"
+							>REC {recordingCountdown}s</span
+						>
 					</div>
 				{/if}
 
@@ -1697,6 +2594,14 @@
 					<div class="filter-loading-indicator">
 						<div class="loading-spinner"></div>
 						<span class="loading-text">Loading Filter...</span>
+					</div>
+				{/if}
+
+				<!-- Video Processing Indicator -->
+				{#if isProcessingVideo}
+					<div class="filter-loading-indicator">
+						<div class="loading-spinner"></div>
+						<span class="loading-text">Processing Video...</span>
 					</div>
 				{/if}
 			</div>
@@ -1710,7 +2615,7 @@
 						on:click={switchCamera}
 						disabled={isRecording}
 					>
-						<RefreshCcw />
+						<RefreshCw />
 					</button>
 
 					<!-- Main Capture Button -->
@@ -1740,7 +2645,8 @@
 						<button
 							class="capture-button video-capture"
 							on:click={startVideoRecording}
-							disabled={isFilterLoading}
+							disabled={isFilterLoading || isProcessingVideo}
+							aria-label="Start video recording"
 						>
 							<div class="capture-ring video-ring">
 								<div class="capture-inner video-inner"></div>
@@ -1750,6 +2656,7 @@
 						<button
 							class="capture-button stop-capture"
 							on:click={stopVideoRecording}
+							aria-label="Stop video recording"
 						>
 							<div class="capture-ring stop-ring">
 								<div class="capture-inner stop-inner"></div>
@@ -1763,12 +2670,13 @@
 							? 'flash-active'
 							: ''}"
 						on:click={toggleFlash}
+						on:touchstart|stopPropagation={toggleFlash}
 						disabled={isRecording}
 						aria-label={isFlashOn
 							? "Turn off flash"
 							: "Turn on flash"}
 					>
-						<Zap />
+						<Sparkles />
 					</button>
 				</div>
 			</div>
@@ -1835,15 +2743,28 @@
 	<div
 		class="filters-modal-overlay"
 		on:click={closeAdditionalFiltersModal}
+		on:touchstart={closeAdditionalFiltersModal}
 		role="button"
 		tabindex="0"
+		on:keydown={(e) => {
+			if (e.key === "Escape") {
+				closeAdditionalFiltersModal();
+			}
+		}}
 	>
-		<div class="filters-modal" on:click|stopPropagation role="dialog">
+		<div
+			class="filters-modal"
+			on:click|stopPropagation
+			on:touchstart|stopPropagation
+			role="dialog"
+			tabindex="-1"
+		>
 			<div class="modal-header">
-				<h3>Additional Filters</h3>
+				<h3>AI Filters</h3>
 				<button
 					class="close-modal-btn"
 					on:click={closeAdditionalFiltersModal}
+					on:touchstart|stopPropagation={closeAdditionalFiltersModal}
 					aria-label="Close additional filters modal"
 				>
 					<span>✕</span>
@@ -1856,6 +2777,7 @@
 						<button
 							class="filter-btn"
 							on:click={removeAdditionalFilter}
+							on:touchstart|stopPropagation={removeAdditionalFilter}
 							class:active={!selectedAdditionalFilter}
 							aria-label="Remove additional filter"
 						>
@@ -1869,11 +2791,13 @@
 					</div>
 
 					<!-- Additional filters -->
-					{#each additionalFilters as filter}
+					<!-- {#each additionalFilters as filter}
 						<div class="filter-item">
 							<button
 								class="filter-btn"
 								on:click={() =>
+									selectAdditionalFilter(filter.image)}
+								on:touchstart|stopPropagation={() =>
 									selectAdditionalFilter(filter.image)}
 								class:active={selectedAdditionalFilter ===
 									filter.image}
@@ -1893,7 +2817,7 @@
 								</div>
 							</button>
 						</div>
-					{/each}
+					{/each} -->
 				</div>
 			</div>
 		</div>
@@ -2224,6 +3148,10 @@
 		justify-content: center;
 		cursor: pointer;
 		transition: all 0.2s ease;
+		touch-action: manipulation;
+		-webkit-tap-highlight-color: transparent;
+		-webkit-touch-callout: none;
+		user-select: none;
 	}
 
 	.flash-btn:active {
@@ -2244,6 +3172,18 @@
 
 	.flash-btn.flash-active:active {
 		background: rgba(255, 215, 0, 0.9);
+	}
+
+	/* Mobile improvements for flash button */
+	@media (max-width: 480px) {
+		.flash-btn {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		.flash-btn:active {
+			background: rgba(255, 255, 255, 0.4);
+		}
 	}
 
 	/* Capture Button */
@@ -2431,6 +3371,28 @@
 		object-fit: contain;
 	}
 
+	/* Hide only specific video control buttons - keep play/pause/replay */
+	.preview-media::-webkit-media-controls-fullscreen-button {
+		display: none !important;
+	}
+
+	.preview-media::-webkit-media-controls-picture-in-picture-button {
+		display: none !important;
+	}
+
+	/* Firefox - hide fullscreen button */
+	.preview-media::-moz-media-controls
+		> :not([class*="play"]):not([class*="volume"]):not(
+			[class*="scrubber"]
+		):not([class*="time"]) {
+		display: none !important;
+	}
+
+	/* General video styling */
+	video.preview-media {
+		outline: none;
+	}
+
 	.preview-actions {
 		display: flex;
 		justify-content: center;
@@ -2516,11 +3478,15 @@
 		height: 100%;
 		background: rgba(0, 0, 0, 0.8);
 		backdrop-filter: blur(10px);
-		z-index: 1000;
+		z-index: 9999;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		padding: 20px;
+		touch-action: manipulation;
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
 	}
 
 	.filters-modal {
@@ -2531,6 +3497,10 @@
 		max-height: 80vh;
 		overflow: hidden;
 		border: 1px solid rgba(255, 255, 255, 0.1);
+		transform: translateZ(0);
+		will-change: transform;
+		z-index: 10000;
+		position: relative;
 	}
 
 	.modal-header {
@@ -2581,16 +3551,91 @@
 		gap: 16px;
 	}
 
+	/* Mobile adjustments for filters grid */
+	@media (max-width: 480px) {
+		.filters-modal-overlay {
+			padding: 10px;
+			align-items: flex-end;
+		}
+
+		.filters-modal {
+			max-height: 85vh;
+			border-radius: 16px 16px 0 0;
+			margin-bottom: 0;
+		}
+
+		.modal-content {
+			padding: 15px;
+			max-height: calc(85vh - 70px);
+		}
+
+		.filters-grid {
+			grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+			gap: 12px;
+		}
+
+		.modal-header {
+			padding: 15px;
+		}
+
+		.modal-header h3 {
+			font-size: 16px;
+		}
+	}
+
+	/* Very small mobile screens */
+	@media (max-width: 360px) {
+		.filters-modal-overlay {
+			padding: 5px;
+		}
+
+		.filters-modal {
+			max-height: 90vh;
+		}
+
+		.modal-content {
+			padding: 12px;
+			max-height: calc(90vh - 60px);
+		}
+
+		.filters-grid {
+			grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+			gap: 10px;
+		}
+
+		.modal-header {
+			padding: 12px;
+		}
+
+		.modal-header h3 {
+			font-size: 15px;
+		}
+	}
+
 	.filter-item {
 		background: rgba(255, 255, 255, 0.05);
 		border-radius: 12px;
 		overflow: hidden;
 		border: 1px solid rgba(255, 255, 255, 0.1);
 		transition: transform 0.2s ease;
+		touch-action: manipulation;
+		-webkit-tap-highlight-color: transparent;
 	}
 
 	.filter-item:hover {
 		transform: scale(1.02);
+	}
+
+	/* Mobile touch improvements */
+	@media (max-width: 480px) {
+		.filter-item {
+			min-height: 140px;
+		}
+
+		.filter-item:active {
+			transform: scale(0.98);
+			background: rgba(255, 255, 255, 0.08);
+		}
 	}
 
 	.filter-preview {
@@ -2598,6 +3643,20 @@
 		height: 120px;
 		overflow: hidden;
 		background: #000;
+		position: relative;
+	}
+
+	/* Mobile adjustments for filter preview */
+	@media (max-width: 480px) {
+		.filter-preview {
+			height: 100px;
+		}
+	}
+
+	@media (max-width: 360px) {
+		.filter-preview {
+			height: 90px;
+		}
 	}
 
 	.filter-image {
@@ -2691,15 +3750,34 @@
 		border-radius: 12px;
 		overflow: hidden;
 		transition: all 0.2s ease;
+		touch-action: manipulation;
+		-webkit-tap-highlight-color: transparent;
+		-webkit-touch-callout: none;
+		user-select: none;
 	}
 
 	.filter-btn:hover {
 		transform: scale(1.02);
 	}
 
+	.filter-btn:active {
+		transform: scale(0.98);
+	}
+
 	.filter-btn.active {
 		border: 2px solid #4ecdc4;
 		box-shadow: 0 0 15px rgba(78, 205, 196, 0.3);
+	}
+
+	/* Mobile improvements for filter buttons */
+	@media (max-width: 480px) {
+		.filter-btn {
+			min-height: 44px; /* Minimum touch target size */
+		}
+
+		.filter-btn:active {
+			background: rgba(255, 255, 255, 0.05);
+		}
 	}
 
 	.no-filter {
@@ -2713,6 +3791,22 @@
 		font-size: 14px;
 		border: 2px dashed rgba(255, 255, 255, 0.3);
 		border-radius: 8px;
+		touch-action: manipulation;
+	}
+
+	/* Mobile adjustments for no-filter */
+	@media (max-width: 480px) {
+		.no-filter {
+			height: 100px;
+			font-size: 12px;
+		}
+	}
+
+	@media (max-width: 360px) {
+		.no-filter {
+			height: 90px;
+			font-size: 11px;
+		}
 	}
 
 	/* Responsive adjustments for larger screens */

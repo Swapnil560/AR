@@ -40,6 +40,7 @@ export async function updateFilter(body) {
 export async function getFilterById({ filterId }) {
 	const response = await Api.get("/filters", {
 		search: `id:${filterId}`,
+		filter: "is_deleted:0",
 	});
 	return response;
 }
@@ -48,6 +49,7 @@ export async function getFilterById({ filterId }) {
 export async function getFiltersByUser({ userId }) {
 	const response = await Api.get("/filters", {
 		search: `user:${userId}`,
+		filter: "is_deleted:0",
 	});
 	return response;
 }

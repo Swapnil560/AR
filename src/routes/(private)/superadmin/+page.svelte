@@ -10,6 +10,7 @@
 	} from "../../../services/actions/user.js";
 	import {
 		getFilters,
+		getAllFilters,
 		updateFilter,
 	} from "../../../services/actions/filter.js";
 	import {
@@ -48,6 +49,7 @@
 	let totalFiltersPages = 0;
 	let showFilterModal = false;
 	let selectedFilter = null;
+	let includeDeletedFilters = false;
 
 	// Price Plan Management State
 	let pricePlans = [];
@@ -134,6 +136,17 @@
 		loadPlans();
 	}
 
+	// Reload filters when includeDeletedFilters toggle changes
+	$: if (
+		includeDeletedFilters !== undefined &&
+		activeTab === "filters" &&
+		user &&
+		users.length > 0
+	) {
+		currentFiltersPage = 1; // Reset to first page
+		loadFilters();
+	}
+
 	async function loadData() {
 		loading = true;
 		try {
@@ -171,10 +184,16 @@
 	async function loadFilters() {
 		loadingFilters = true;
 		try {
-			const response = await getFilters({
-				page: `${currentFiltersPage},${filtersPerPage}`,
-				sort: "-created_at",
-			});
+			const response = includeDeletedFilters
+				? await getAllFilters({
+						page: `${currentFiltersPage},${filtersPerPage}`,
+						sort: "-created_at",
+						includeDeleted: true,
+					})
+				: await getFilters({
+						page: `${currentFiltersPage},${filtersPerPage}`,
+						sort: "-created_at",
+					});
 			if (response.err) {
 				error = "Failed to load filters";
 				return;
@@ -878,6 +897,18 @@
 				<div class="tab-content">
 					<div class="section-header">
 						<h2 class="section-title">Filter Management</h2>
+						<div class="filter-controls">
+							<label class="toggle-container">
+								<input
+									type="checkbox"
+									bind:checked={includeDeletedFilters}
+									class="toggle-checkbox"
+								/>
+								<span class="toggle-label"
+									>Show deleted filters</span
+								>
+							</label>
+						</div>
 					</div>
 
 					<div class="table-container">
@@ -2089,6 +2120,33 @@
 		font-size: 1.8rem;
 		font-weight: 700;
 		margin: 0;
+	}
+
+	.filter-controls {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.toggle-container {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		cursor: pointer;
+		font-size: 0.9rem;
+		color: #4a5568;
+	}
+
+	.toggle-checkbox {
+		accent-color: #667eea;
+		width: 1.1rem;
+		height: 1.1rem;
+		cursor: pointer;
+	}
+
+	.toggle-label {
+		user-select: none;
+		cursor: pointer;
 	}
 
 	.action-btn {

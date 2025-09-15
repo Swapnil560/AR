@@ -413,9 +413,12 @@
 			}
 
 			// Extract filename from uploadedImageUrl (remove path prefix if exists)
-			const filename = uploadedImageUrl.split("/").pop();
-			// Generate shortened URL with user ID
-			filterLink = `${window.location.origin}/filter/ar?filter=${filename}&user=${user.id}`;
+			const filename = uploadedImageUrl
+				.split("/")
+				.pop()
+				.replace(".png", "");
+			// Generate shortened/obfuscated URL without .png and without user= prefix
+			filterLink = `${window.location.origin}/filter/ar?filter=${filename}&${user.id}`;
 			qrCodeUrl = await QRCode.toDataURL(filterLink);
 			uploadSuccess = true;
 		} catch (error) {
@@ -449,7 +452,7 @@
 </script>
 
 <svelte:head>
-	<title>RongCam Filter Upload</title>
+	<title>MyAR Filter Upload</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </svelte:head>
@@ -459,7 +462,7 @@
 		<div class="header-content">
 			<h1 class="logo">
 				<span class="logo-icon"><Logo /></span>
-				RongCam
+				MyAR
 			</h1>
 			<div class="header-actions">
 				<span class="welcome-text"

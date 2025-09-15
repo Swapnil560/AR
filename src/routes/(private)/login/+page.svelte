@@ -32,35 +32,66 @@
 
 	// Function to redirect to subdomain URL
 	function redirectToSubdomain(user) {
-		const host = getHost();
-		const protocol = window.location.protocol;
+		try {
+			const host = getHost();
+			const protocol = window.location.protocol;
 
-		let targetPath = "";
-		if (user.role === "super_admin") {
-			targetPath = "/superadmin";
-		} else if (user.role === "admin") {
-			targetPath = "/admin";
-		} else {
-			targetPath = "/dashboard";
-		}
+			console.log("Current window.location.host:", window.location.host);
+			console.log("getHost() result:", host);
 
-		// If user has a subdomain, redirect to subdomain URL
-		if (user.subdomain) {
-			// Store user data in sessionStorage before redirect
-			sessionStorage.setItem("user", JSON.stringify(user));
+			let targetPath = "";
+			if (user.role === "super_admin") {
+				targetPath = "/superadmin";
+			} else if (user.role === "admin") {
+				targetPath = "/admin";
+			} else {
+				targetPath = "/dashboard";
+			}
 
-			// Pass user data as URL parameter (base64 encoded)
-			const userData = btoa(JSON.stringify(user));
-			const subdomainUrl = `${protocol}//${user.subdomain}.${host}${targetPath}?auth=${userData}`;
+			// If user has a subdomain, redirect to subdomain URL
+			if (user.subdomain && host) {
+				// Check if we're already on the correct subdomain
+				const expectedSubdomainHost = `${user.subdomain}.${host}`;
+				const currentHost = window.location.host;
 
-			console.log("Redirecting to subdomain URL:", subdomainUrl);
-			window.location.href = subdomainUrl;
-		} else {
-			// If no subdomain, use regular navigation
-			console.log(
-				"No subdomain found, using regular navigation to:",
-				targetPath
-			);
+				console.log("Expected subdomain host:", expectedSubdomainHost);
+				console.log("Current host:", currentHost);
+
+				if (currentHost !== expectedSubdomainHost) {
+					// Store user data in sessionStorage before redirect
+					sessionStorage.setItem("user", JSON.stringify(user));
+
+					// Pass user data as URL parameter (base64 encoded)
+					const userData = btoa(JSON.stringify(user));
+					const subdomainUrl = `${protocol}//${expectedSubdomainHost}${targetPath}?auth=${userData}`;
+
+					console.log("Redirecting to subdomain URL:", subdomainUrl);
+					window.location.href = subdomainUrl;
+				} else {
+					console.log(
+						"Already on correct subdomain, using regular navigation"
+					);
+					goto(targetPath);
+				}
+			} else {
+				// If no subdomain or host detection failed, use regular navigation
+				console.log(
+					"No subdomain or host detection failed, using regular navigation to:",
+					targetPath
+				);
+				goto(targetPath);
+			}
+		} catch (error) {
+			console.error("Error in redirectToSubdomain:", error);
+			// Fallback to regular navigation
+			let targetPath = "";
+			if (user.role === "super_admin") {
+				targetPath = "/superadmin";
+			} else if (user.role === "admin") {
+				targetPath = "/admin";
+			} else {
+				targetPath = "/dashboard";
+			}
 			goto(targetPath);
 		}
 	}
@@ -192,7 +223,7 @@
 
 				const sendEmailRes = await sendEmail({
 					sendTo: [{ name: formData.name, email: formData.email }],
-					subject: "Your Rong Digital Verification Code",
+					subject: "Your MyAR Verification Code",
 					htmlPart: htmlTemplate,
 				});
 
@@ -296,7 +327,7 @@
 						/>
 					</svg>
 				</div>
-				<span class="logo-text">Rong Digital</span>
+				<span class="logo-text">MyAR</span>
 			</div>
 			<h1 class="auth-title">
 				{isLogin ? "Welcome Back" : "Create Account"}
@@ -714,7 +745,6 @@
 		width: 100%;
 		max-width: 480px;
 		position: relative;
-		border: 1px solid rgba(255, 255, 255, 0.2);
 	}
 
 	.auth-header {

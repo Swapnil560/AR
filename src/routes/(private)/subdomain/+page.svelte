@@ -217,7 +217,7 @@
 						/>
 					</svg>
 				</div>
-				<span>Rong Digital</span>
+				<span>RongCam</span>
 			</div>
 			<h1>Choose Your Subdomain</h1>
 			<p>Select a unique subdomain for your account</p>
@@ -298,7 +298,7 @@
 						class="subdomain-input"
 						autocomplete="off"
 					/>
-					<span class="subdomain-suffix">.rongdigital.com</span>
+					<span class="subdomain-suffix">.myar.in</span>
 				</div>
 				<small class="input-help">
 					Use 3-63 characters. Letters, numbers, and hyphens only (no
@@ -361,8 +361,8 @@
 								/>
 							</svg>
 							<span
-								><strong>{subdomainName}</strong
-								>.rongdigital.com is available!</span
+								><strong>{subdomainName}</strong>.myar.in is
+								available!</span
 							>
 						</div>
 					{:else}
@@ -397,8 +397,8 @@
 								/>
 							</svg>
 							<span
-								><strong>{subdomainName}</strong
-								>.rongdigital.com is already taken</span
+								><strong>{subdomainName}</strong>.myar.in is
+								already taken</span
 							>
 						</div>
 					{/if}

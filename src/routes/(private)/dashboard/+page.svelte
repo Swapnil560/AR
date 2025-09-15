@@ -342,10 +342,13 @@
 
 			// Generate QR codes for each filter
 			for (let filter of filters) {
-				// Extract filename from filter_url
-				const filename = filter.filter_url.split("/").pop();
-				// Generate shortened URL with user ID
-				const filterLink = `${window.location.origin}/filter/ar?filter=${filename}&user=${filter.user}`;
+				// Extract filename from filter_url and remove .png extension
+				const filename = filter.filter_url
+					.split("/")
+					.pop()
+					.replace(".png", "");
+				// Generate shortened/obfuscated URL without .png and without user= prefix
+				const filterLink = `${window.location.origin}/filter/ar?filter=${filename}&${filter.user}`;
 				filter.qr_code = await QRCode.toDataURL(filterLink);
 				filter.share_link = filterLink;
 			}
@@ -472,7 +475,7 @@
 </script>
 
 <svelte:head>
-	<title>RongCam Dashboard</title>
+	<title>MyAR Dashboard</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </svelte:head>
@@ -483,10 +486,10 @@
 			<div class="logo-icon">
 				<Logo />
 
-				<h1 class="logo">RongCam</h1>
+				<h1 class="logo">MyAR</h1>
 			</div>
 			<div class="header-actions">
-				<span class="welcome-text">Welcome, {user?.name || "User"}</span
+				<span class="welcome-text">Welcome- {user?.name || "User"}</span
 				>
 				<button class="logout-btn" on:click={logout}>
 					<Power />
