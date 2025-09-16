@@ -15,7 +15,7 @@
       }
     } else {
       // Not logged in, redirect to login
-      goto('/login');
+      goto('/landing-page');
     }
   });
 </script>

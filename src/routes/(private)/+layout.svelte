@@ -10,7 +10,7 @@
 		if (window.location.pathname === "/login") return;
 
 		user = localStorage.getItem("user");
-		if (!user) goto("/login");
+		if (!user) goto("/landing-page");
 	});
 
 	function logout() {
