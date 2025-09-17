@@ -12,7 +12,7 @@
     {
       name: "Starter",
       description: "Perfect for individuals & first-time creators",
-      monthlyPrice: 2999,
+      monthlyPrice: 6999,
       annualPrice: 32000,
       features: [
         "1 Static Filter / month",
@@ -81,21 +81,21 @@
       cta: "Get This Pack",
     },
     {
-      name: "Premium Pack",
-      description: "Up to 3 Animated Filters",
-      price: 27999,
-      cta: "Get This Pack",
-    },
-    {
       name: "Animated Filter",
       description: "1 Animated Filter",
       price: 14999,
       cta: "Get This Pack",
     },
     {
-      name: "AI Filter",
-      description: "1 AI Face Tracking Filter",
-      price: 4999,
+      name: "AI Animated Filter",
+      description: "1 AI powered Animated Filter",
+      price: 24999,
+      cta: "Get This Pack",
+    },
+    {
+      name: "Premium Pack",
+      description: "Up to 3 Animated AI Filters",
+      price: 44999,
       cta: "Get This Pack",
     },
   ];
@@ -113,15 +113,17 @@
       </p>
 
       <!-- Toggle -->
-      <div class="toggle">
-        <span class:active={!isAnnual}>Monthly</span>
-        <button class="switch" on:click={toggleAnnual}>
-          <div class:knob-annual={isAnnual} class="knob"></div>
-        </button>
-        <span class:active={isAnnual}>Annual</span>
-        {#if isAnnual}
+      <div class="toggle-container">
+        <div class="toggle">
+          <span class:active={!isAnnual}>Monthly</span>
+          <button class="switch" on:click={toggleAnnual}>
+            <div class:knob-annual={isAnnual} class="knob"></div>
+          </button>
+          <span class:active={isAnnual}>Annual</span>
+        </div>
+        <!-- {#if isAnnual}
           <span class="save-badge">Save up to 20%</span>
-        {/if}
+        {/if} -->
       </div>
     </div>
 
@@ -153,46 +155,70 @@
 
 <style>
   .pricing-section {
-    padding: 0rem 1rem;
+    padding: 4rem 1rem;
     background: var(--background, #fafafa);
   }
+  
   .container {
     max-width: 1280px;
     margin: 0 auto;
+    padding: 0 1.5rem;
   }
+  
   .header {
     text-align: center;
-    margin-bottom: 4rem;
+    margin-bottom: 3rem;
   }
+  
   .header h2 {
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 1rem;
+    line-height: 1.2;
   }
+  
   .header p {
     font-size: 1.125rem;
     color: #666;
     margin-bottom: 2rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
   }
+  
   .gradient-text {
     background: linear-gradient(90deg, #6366f1, #ec4899);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
+  
+  .toggle-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  
   .toggle {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 1rem;
-    margin-bottom: 3rem;
   }
+  
   .toggle span {
     font-weight: 500;
     color: #999;
+    font-size: 1rem;
   }
+  
   .toggle span.active {
     color: #6366f1;
   }
+  
   .switch {
     position: relative;
     width: 56px;
@@ -202,10 +228,13 @@
     background: #eee;
     cursor: pointer;
     overflow: hidden;
+    transition: border-color 0.3s;
   }
+  
   .switch:hover {
     border-color: #6366f1;
   }
+  
   .knob {
     position: absolute;
     top: 2px;
@@ -215,65 +244,141 @@
     background: #fff;
     border-radius: 50%;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    transition: transform 0.3s;
+    transition: transform 0.3s ease;
   }
+  
   .knob-annual {
     transform: translateX(28px);
   }
+  
   .save-badge {
     background: linear-gradient(90deg, #6366f1, #ec4899);
     color: white;
-    padding: 0.25rem 0.75rem;
+    padding: 0.4rem 1rem;
     border-radius: 9999px;
     font-size: 0.85rem;
     font-weight: 500;
   }
+  
   .plans {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 1.5rem;
+    gap: 2rem;
     margin-bottom: 5rem;
   }
+  
   @media (min-width: 768px) {
     .plans {
       grid-template-columns: repeat(2, 1fr);
     }
   }
   
-  @media (min-width: 1200px) {
+  @media (min-width: 1024px) {
     .plans {
       grid-template-columns: repeat(4, 1fr);
     }
   }
+  
   .event-packs {
     margin-bottom: 5rem;
   }
+  
   .event-header {
     text-align: center;
     margin-bottom: 3rem;
   }
+  
   .event-header h3 {
     font-size: 2rem;
     font-weight: 700;
     margin-bottom: 1rem;
+    line-height: 1.2;
   }
+  
   .event-header p {
     font-size: 1.125rem;
     color: #666;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
   }
+  
   .packs {
     display: grid;
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }
-  @media (min-width: 768px) {
+  
+  @media (min-width: 640px) {
     .packs {
       grid-template-columns: repeat(2, 1fr);
     }
   }
-  @media (min-width: 1200px) {
+  
+  @media (min-width: 1024px) {
     .packs {
       grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .pricing-section {
+      padding: 3rem 1rem;
+    }
+    
+    .header h2 {
+      font-size: 2rem;
+    }
+    
+    .header p {
+      font-size: 1rem;
+    }
+    
+    .toggle span {
+      font-size: 0.9rem;
+    }
+    
+    .event-header h3 {
+      font-size: 1.75rem;
+    }
+    
+    .event-header p {
+      font-size: 1rem;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .header h2 {
+      font-size: 1.75rem;
+    }
+    
+    .toggle {
+      gap: 0.75rem;
+    }
+    
+    .toggle span {
+      font-size: 0.85rem;
+    }
+    
+    .switch {
+      width: 50px;
+      height: 26px;
+    }
+    
+    .knob {
+      width: 18px;
+      height: 18px;
+    }
+    
+    .knob-annual {
+      transform: translateX(24px);
+    }
+    
+    .save-badge {
+      font-size: 0.8rem;
+      padding: 0.3rem 0.8rem;
     }
   }
 </style>

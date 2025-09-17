@@ -173,3 +173,4 @@ export const OTPEmailTemplate = (otp: string) => {
     </div>
     `;
 };
+

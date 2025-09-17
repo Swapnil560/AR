@@ -23,17 +23,21 @@
     <div class="bg-circle c4"></div>
 
     <header class="hero-header">
-      <div class="logo gradient">myAR.in</div>
-      <button class="btn primary" on:click={handleLogin}>Login</button>
+      <div class="container">
+        <a href="/landing-page" style="text-decoration: none;">
+          <div class="logo gradient">myAR.in</div>
+        </a>
+        <button class="btn primary">Contact Us</button>
+      </div>
     </header>
 
-    <div class="hero-container">
+    <div class="container hero-container">
       <!-- Left Content -->
       <div class="left">
         <div class="intro">
           <div class="badge">
             <div class="dot"></div>
-            <span>India's Leading AR Filter Studio</span>
+            <span>Your own AR Filter Studio</span>
           </div>
 
           <h1>
@@ -57,15 +61,15 @@
         <!-- Trust Indicators -->
         <div class="stats">
           <div>
-            <div class="stat-number">500+</div>
+            <div class="stat-number">100+</div>
             <div class="stat-label">Filters Created</div>
           </div>
           <div>
-            <div class="stat-number">100+</div>
+            <div class="stat-number">10+</div>
             <div class="stat-label">Happy Clients</div>
           </div>
           <div>
-            <div class="stat-number">24hrs</div>
+            <div class="stat-number">2hrs</div>
             <div class="stat-label">Avg. Delivery</div>
           </div>
         </div>
@@ -80,6 +84,10 @@
 
             <div class="filter-demo">
               <div class="demo-shape">
+                <div class="tracking dot-a" />
+                <!-- <div class="tracking dot-b" /> -->
+                <div class="tracking dot-c" />
+                <div class="tracking dot-d" />
                 <div class="circle"></div>
                 <div class="box top"></div>
                 <div class="oval left"></div>
@@ -102,15 +110,12 @@
         <!-- Floating Cards -->
         <div class="floating card1">
           <div class="title">Education</div>
-          <!-- <div class="price">₹9,999</div> -->
         </div>
         <div class="floating card2">
           <div class="title">Promotion</div>
-          <!-- <div class="price">₹4,999</div> -->
         </div>
         <div class="floating card3">
           <div class="title">Marketing</div>
-          <!-- <div class="price">₹14,999</div> -->
         </div>
       </div>
     </div>
@@ -128,119 +133,122 @@
 </div>
 
 <style>
+  /* Global container for consistent width */
+  .container {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
   .page {
     min-height: 100vh;
     background: var(--background, #fdfdfd);
-  }
-  @media (max-width: 640px) {
-    .hero {
-      padding-left: 1rem;
-      padding-right: 1rem;
-    }
+    overflow-x: hidden;
   }
 
-  /* Hero */
+  /* Header fixes */
+  .hero-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 1.25rem 0;
+    background: rgba(255, 255, 255, 0.3); /* semi-transparent */
+    backdrop-filter: blur(10px); /* blur effect */
+    -webkit-backdrop-filter: blur(10px); /* Safari support */
+    border: 1px solid rgba(255, 255, 255, 0.4);
+  }
+
+  .hero-header .container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+  }
+
+  .logo {
+    font-size: 1.8rem;
+    font-weight: 700;
+  }
+
+  /* Hero section responsive fixes */
   .hero {
     position: relative;
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(
+    /* background: linear-gradient(
       to bottom right,
       var(--background, #f9f9ff),
       rgba(99, 102, 241, 0.05),
       rgba(236, 72, 153, 0.1)
-    );
-    /* background: linear-gradient(135deg, #F5F5F9 0%, #1A1AE6 50%, #B447EB 100%);
-  background-size: 400% 400%; */
+    ); */
     overflow: hidden;
+    padding-top: 6rem;
   }
 
-  /* Background Pattern */
-  .bg-pattern {
-    position: absolute;
-    inset: 0;
-    background-image: radial-gradient(
-      circle at center,
-      var(--primary, #6366f1) 1px,
-      transparent 1px
-    );
-    background-size: 50px 50px;
-    opacity: 0.1;
+  .hero {
+    background: radial-gradient(
+        circle at 20% 30%,
+        rgba(138, 119, 239, 0.6),
+        transparent 50%
+      ),
+      radial-gradient(
+        circle at 80% 20%,
+        rgba(101, 76, 243, 0.5),
+        transparent 50%
+      ),
+      radial-gradient(
+        circle at 50% 80%,
+        rgba(173, 121, 255, 0.35),
+        transparent 60%
+      ),
+      linear-gradient(180deg, #c4cbf7 0%, #ffffff 100%);
+    background-blend-mode: screen;
   }
 
-  /* Background Circles */
-  .bg-circle {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(30px);
-    animation: pulse 6s infinite;
-  }
-  .c1 {
-    top: 5rem;
-    left: 2.5rem;
-    width: 8rem;
-    height: 8rem;
-    background: rgba(99, 102, 241, 0.1);
-  }
-  .c2 {
-    top: 8rem;
-    right: 5rem;
-    width: 6rem;
-    height: 6rem;
-    background: rgba(236, 72, 153, 0.15);
-    animation-delay: 0.75s;
-  }
-  .c3 {
-    bottom: 8rem;
-    left: 25%;
-    width: 5rem;
-    height: 5rem;
-    background: rgba(99, 102, 241, 0.2);
-    animation-delay: 1.5s;
-  }
-  .c4 {
-    top: 50%;
-    right: 25%;
-    width: 4rem;
-    height: 4rem;
-    background: rgba(236, 72, 153, 0.1);
-    animation-delay: 3s;
-  }
-
-  @keyframes pulse {
-    0%,
-    100% {
-      transform: scale(1);
-    }
-    50% {
-      transform: scale(1.1);
-    }
-  }
-
-  /* Hero Container */
   .hero-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding-top: 5rem;
-    padding-bottom: 2rem;
     display: grid;
-    gap: 8rem;
+    grid-template-columns: 1fr;
+    gap: 4rem;
     align-items: center;
     position: relative;
     z-index: 10;
+    width: 100%;
+    padding: 2rem 1.5rem;
   }
-  
+
   @media (min-width: 1024px) {
     .hero-container {
       grid-template-columns: 1fr 1fr;
-      padding-left: 5rem;
+      gap: 6rem;
+      padding: 3rem 1.5rem;
     }
   }
 
-  /* Left Section */
-  .left .badge {
+  /* Left content alignment */
+  .left {
+    order: 1;
+  }
+
+  @media (min-width: 1024px) {
+    .left {
+      text-align: left;
+      order: 1;
+    }
+  }
+
+  .badge {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
@@ -250,7 +258,9 @@
     border-radius: 9999px;
     font-size: 0.9rem;
     font-weight: 500;
+    margin-bottom: 1.5rem;
   }
+
   .badge .dot {
     width: 0.5rem;
     height: 0.5rem;
@@ -263,67 +273,84 @@
     font-size: 2.5rem;
     font-weight: 800;
     line-height: 1.2;
+    margin-bottom: 1.5rem;
   }
+
   @media (min-width: 768px) {
     h1 {
       font-size: 3.5rem;
     }
   }
+
   @media (min-width: 1024px) {
     h1 {
-      font-size: 4.5rem;
+      font-size: 3.8rem;
     }
-  }
-  h1 .gradient {
-    background: linear-gradient(to right, #6366f1, #9333ea);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  h1 .foreground {
-    color: #111827;
   }
 
   .left p {
-    margin-top: 1.5rem;
-    font-size: 1.2rem;
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
     color: #6b7280;
-    max-width: 30rem;
     line-height: 1.6;
+    max-width: 100%;
+  }
+
+  @media (min-width: 768px) {
+    .left p {
+      font-size: 1.2rem;
+      max-width: 30rem;
+    }
   }
 
   .buttons {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    margin-top: 2rem;
+    margin-bottom: 2rem;
+    justify-content: center;
   }
+
   @media (min-width: 640px) {
     .buttons {
       flex-direction: row;
+      justify-content: flex-start;
     }
   }
+
   .btn {
-    padding: 1rem 2rem;
+    padding: 0.9rem 1.8rem;
     border-radius: 0.75rem;
     font-weight: 600;
-    font-size: 1.1rem;
+    font-size: 1rem;
     cursor: pointer;
     transition: all 0.3s;
+    border: none;
   }
+
+  @media (min-width: 768px) {
+    .btn {
+      padding: 1rem 2rem;
+      font-size: 1.1rem;
+    }
+  }
+
   .btn.primary {
     background: linear-gradient(to right, #6366f1, #9333ea);
     color: white;
-    border-color: white;
   }
+
   .btn.primary:hover {
     transform: scale(1.05);
     box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
   }
+
   .btn.secondary {
     background: white;
     color: #111827;
     border: 1px solid rgba(99, 102, 241, 0.2);
   }
+
   .btn.secondary:hover {
     background: rgba(99, 102, 241, 0.1);
     border-color: rgba(99, 102, 241, 0.4);
@@ -332,32 +359,63 @@
   .stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 2rem;
-    margin-top: 2rem;
+    gap: 1.5rem;
     padding-top: 2rem;
     border-top: 1px solid #e5e7eb;
+    max-width: 400px;
+    margin: 0 auto;
   }
+
+  @media (min-width: 1024px) {
+    .stats {
+      margin: 0;
+    }
+  }
+
   .stat-number {
     font-size: 1.5rem;
     font-weight: bold;
     color: var(--primary, #6366f1);
   }
+
   .stat-label {
     font-size: 0.9rem;
     color: #6b7280;
   }
 
-  /* Right Section */
+  /* Right content alignment */
+  .right {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    order: 1;
+  }
+
+  @media (min-width: 1024px) {
+    .right {
+      order: 2;
+    }
+  }
+
   .phone {
     position: relative;
-    width: 20rem;
-    height: 37.5rem;
+    width: 18rem;
+    height: 35rem;
     margin: 0 auto;
     border-radius: 3rem;
     padding: 1rem;
     background: white;
     box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+    z-index: 2;
   }
+
+  @media (min-width: 768px) {
+    .phone {
+      width: 20rem;
+      height: 37.5rem;
+    }
+  }
+
   .phone-screen {
     width: 100%;
     height: 100%;
@@ -366,6 +424,47 @@
     position: relative;
     overflow: hidden;
   }
+
+  .dot-a,
+  .dot-c,
+  .dot-d {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+  }
+
+  /* adjust positions as per screenshot */
+  .dot-a {
+    top: -40%;
+    left: -3%;
+    transform: translateX(-50%);
+    background: var(--primary);
+  }
+
+  /* .dot-b {
+    top: 40%;
+    left: 90%;
+    background: var(--accent);
+    animation-delay: 0.12s;
+  } */
+
+  .dot-c {
+    top: -50%;
+    right: 2%;
+    background: var(--accent);
+    animation-delay: 0.24s;
+  }
+
+  .dot-d {
+    bottom: -20%;
+    left: -10%;
+    transform: translateX(-50%);
+    background: rgba(var(--primary-rgb), 0.75);
+    animation-delay: 0.36s;
+  }
+
   .notch {
     position: absolute;
     top: 1rem;
@@ -391,9 +490,11 @@
     justify-content: center;
     position: relative;
   }
+
   .demo-shape {
     position: relative;
   }
+
   .demo-shape .circle {
     width: 12rem;
     height: 15rem;
@@ -401,6 +502,7 @@
     border-radius: 50%;
     animation: pulse 2s infinite;
   }
+
   .demo-shape .box.top {
     position: absolute;
     top: -2rem;
@@ -413,6 +515,7 @@
     border-radius: 0.5rem;
     animation: bounce 2s infinite;
   }
+
   .demo-shape .oval {
     position: absolute;
     top: 4rem;
@@ -423,14 +526,17 @@
     border-radius: 50%;
     animation: pulse 2s infinite;
   }
+
   .demo-shape .oval.left {
     left: -2rem;
     animation-delay: 0.75s;
   }
+
   .demo-shape .oval.right {
     right: -2rem;
     animation-delay: 1.5s;
   }
+
   .demo-shape .label {
     position: absolute;
     bottom: -2rem;
@@ -461,6 +567,7 @@
     display: flex;
     gap: 0.75rem;
   }
+
   .control {
     width: 3rem;
     height: 3rem;
@@ -470,49 +577,128 @@
     align-items: center;
     justify-content: center;
   }
+
   .inner-circle {
     width: 2rem;
     height: 2rem;
     background: #6366f1;
     border-radius: 50%;
   }
+
   .square {
     width: 1.5rem;
     height: 1.5rem;
     border: 2px solid white;
   }
 
+  /* Floating cards positioning */
   .floating {
     position: absolute;
     background: white;
     border: 1px solid #e5e7eb;
     border-radius: 0.5rem;
-    padding: 0.75rem;
+    padding: 0.75rem 1rem;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
     animation: float 4s infinite ease-in-out;
+    z-index: 1;
+    min-width: 100px;
   }
+
   .card1 {
-    top: 15rem;
-    right: 40rem;
+    top: 10%;
+    right: 80%;
   }
+
   .card2 {
-    top: 25rem;
-    right: 5rem;
+    top: 35%;
+    right: -8%;
     animation-delay: 1s;
   }
+
   .card3 {
-    bottom: 12rem;
-    right: 40rem;
+    bottom: 15%;
+    right: 80%;
     animation-delay: 2s;
+  }
+
+  @media (min-width: 1536px) {
+    .card1 {
+      right: 90%;
+    }
+    .card3 {
+      right: 90%;
+    }
   }
 
   .title {
     font-size: 0.8rem;
     font-weight: 600;
   }
-  .price {
-    font-size: 0.8rem;
-    color: #6b7280;
+
+  /* Background Pattern */
+  .bg-pattern {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(
+      circle at center,
+      var(--primary, #6366f1) 1px,
+      transparent 1px
+    );
+    background-size: 50px 50px;
+    opacity: 0.1;
+  }
+
+  /* Background Circles */
+  .bg-circle {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(30px);
+    animation: pulse 6s infinite;
+  }
+
+  .c1 {
+    top: 5rem;
+    left: 2.5rem;
+    width: 8rem;
+    height: 8rem;
+    background: rgba(99, 102, 241, 0.1);
+  }
+
+  .c2 {
+    top: 8rem;
+    right: 5rem;
+    width: 6rem;
+    height: 6rem;
+    background: rgba(71, 4, 37, 0.15);
+    animation-delay: 0.75s;
+  }
+
+  .c3 {
+    bottom: 8rem;
+    left: 25%;
+    width: 5rem;
+    height: 5rem;
+    background: rgba(1, 1, 20, 0.2);
+    animation-delay: 1.5s;
+  }
+
+  .c4 {
+    top: 50%;
+    right: 25%;
+    width: 4rem;
+    height: 4rem;
+    background: rgba(150, 7, 78, 0.1);
+    animation-delay: 3s;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
   }
 
   @keyframes float {
@@ -525,52 +711,6 @@
     }
   }
 
-  .hero-header {
-    position: absolute;
-    top: 1rem;
-    left: 0;
-    right: 0;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    z-index: 20;
-  }
-
-  /* @media (min-width: 1024px) {
-    .hero-header {
-      grid-template-columns: 1fr 1fr;
-    }
-  } */
-  /* .hero-header,
-  .hero-container {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  } */
-  @media (min-width: 1024px) {
-    .hero-header,
-    .hero-container {
-      /* padding-left: 5rem; */
-      padding-right: 12rem;
-    }
-  }
-  .logo {
-    font-size: 2rem;
-    font-weight: 700;
-    margin-left: 0; /* reset */
-  }
-
-  @media (min-width: 1024px) {
-    .hero-header {
-      padding: 0 5rem; /* same padding as .intro text */
-    }
-    .logo {
-      margin-left: 0; /* align with intro badge/span */
-    }
-  }
-
   .gradient {
     background: linear-gradient(to right, #6366f1, #9333ea);
     -webkit-background-clip: text;
@@ -579,21 +719,52 @@
     color: transparent;
   }
 
-  /* .login-btn {
-    padding: 0.6rem 1.2rem;
-    border-radius: 0.5rem;
-    background: linear-gradient(to right, #6366f1, #9333ea);
-    color: white;
-    font-weight: 500;
-    border: none;
-    cursor: pointer;
-    transition:
-      transform 0.2s ease,
-      box-shadow 0.2s ease;
+  /* Responsive adjustments */
+  @media (max-width: 1023px) {
+    .hero-container {
+      padding-top: 2rem;
+      padding-bottom: 2rem;
+    }
+
+    .right {
+      margin-bottom: 2rem;
+    }
+
+    /* .floating {
+      display: none;
+    } */
   }
 
-  .login-btn:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
-  } */
+  @media (max-width: 640px) {
+    .hero {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+    }
+
+    .phone {
+      width: 16rem;
+      height: 32rem;
+    }
+
+    .stats {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .stat-number {
+      font-size: 1.3rem;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+    }
+
+    .hero-header .container {
+      padding: 0 1rem;
+    }
+  }
 </style>

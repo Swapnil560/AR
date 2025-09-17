@@ -151,6 +151,12 @@
 				console.error("No rows affected - user not found");
 				isSaving = false;
 				return;
+			} else {
+				console.log("Subdomain updated successfully");
+				//account under provisioning email need to send
+
+
+				
 			}
 
 			successMsg =

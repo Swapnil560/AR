@@ -99,6 +99,7 @@
       justify-content: center;
       margin: 0 auto 1rem;
       box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+      color: white;
     }
     .icon-svg {
       width: 32px;
