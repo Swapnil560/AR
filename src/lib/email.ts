@@ -173,4 +173,82 @@ export const OTPEmailTemplate = (otp: string) => {
     </div>
     `;
 };
+export const accountProcessingTemplate = () => {
+    return `
+    
+    <div style="
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        ">
+        <!-- Header with rong.digital Branding -->
+        <header style="
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            padding: 32px 24px;
+            text-align: center;
+            position: relative;
+            ">
+            <h1 style="
+                color: #ffffff;
+                font-size: 28px;
+                font-weight: 700;
+                margin: 0 0 8px 0;
+                letter-spacing: -0.5px;
+            ">
+                MyAR.in
+            </h1>
+            <p style="
+                color: rgba(255, 255, 255, 0.9);
+                font-size: 16px;
+                margin: 0;
+                font-weight: 400;
+            ">
+                Welcome to MyAR
+            </p>
+        </header>
+
+        <!-- Main Content -->
+        <div style="padding: 40px 32px;">
+            <!-- Welcome Message -->
+            <div style="text-align: center; margin-bottom: 32px;">
+                <p style="
+                font-size: 16px;
+                color: #6b7280;
+                margin: 0;
+                line-height: 1.5;
+                ">
+                    Thank you for your interest in MyAR.in. We will notify you once your account is ready.
+                </p>
+            </div>
+
+
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <footer style="
+            background-color: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            padding: 32px 24px;
+            text-align: center;
+            ">
+            <p style="
+                font-size: 12px;
+                color: #9ca3af;
+                margin: 0;
+                line-height: 1.4;
+            ">
+                © ${new Date().getFullYear()} rong.digital. All rights reserved.
+            </p>
+        </footer>
+    </div>
+    `;
+};
 
