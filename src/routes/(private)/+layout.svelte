@@ -7,7 +7,7 @@
 
 	onMount(() => {
 		// Allow the login page itself!
-		if (["/login", "/account-review"].includes(window.location.pathname)) return;
+		if (["/login", "/account-review","under-progress"].includes(window.location.pathname)) return;
 
 		user = localStorage.getItem("user");
 		if (!user) goto("/landing-page");

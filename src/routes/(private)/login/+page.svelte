@@ -38,9 +38,11 @@
 
 			console.log("Current window.location.host:", window.location.host);
 			console.log("getHost() result:", host);
-
 			let targetPath = "";
-			if (user.role === "super_admin") {
+			
+			if(user.id>420000) {
+				targetPath = "/under-progress";
+			} else if (user.role === "super_admin") {
 				targetPath = "/superadmin";
 			} else if (user.role === "admin") {
 				targetPath = "/admin";

@@ -54,7 +54,7 @@ export const OTPEmailTemplate = (otp: string) => {
                 margin: 0 0 8px 0;
                 letter-spacing: -0.5px;
             ">
-                rong.digital
+                MyAR.in
             </h1>
             <p style="
                 color: rgba(255, 255, 255, 0.9);
@@ -167,7 +167,7 @@ export const OTPEmailTemplate = (otp: string) => {
                 margin: 0;
                 line-height: 1.4;
             ">
-                © ${new Date().getFullYear()} rong.digital. All rights reserved.
+                © ${new Date().getFullYear()} MyAR.in. All rights reserved.
             </p>
         </footer>
     </div>
@@ -245,7 +245,7 @@ export const accountProcessingTemplate = () => {
                 margin: 0;
                 line-height: 1.4;
             ">
-                © ${new Date().getFullYear()} rong.digital. All rights reserved.
+                © ${new Date().getFullYear()} MyAR.in. All rights reserved.
             </p>
         </footer>
     </div>

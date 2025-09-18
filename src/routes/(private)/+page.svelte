@@ -1,21 +1,24 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
-  
+  import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
+
   onMount(() => {
     // Check if user is logged in
-    const userData = localStorage.getItem('user');
+    const userData = localStorage.getItem("user");
     if (userData) {
       const user = JSON.parse(userData);
       // Redirect based on user role
-      if (user.role === 'admin') {
-        goto('/admin');
+      if (user.id > 420000) {
+        goto("/under-progress");
+      }
+      if (user.role === "admin") {
+        goto("/admin");
       } else {
-        goto('/dashboard');
+        goto("/dashboard");
       }
     } else {
       // Not logged in, redirect to login
-      goto('/landing-page');
+      goto("/landing-page");
     }
   });
 </script>
@@ -34,7 +37,7 @@
     min-height: 100vh;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   }
 
   .loading-spinner {
@@ -48,7 +51,11 @@
   }
 
   @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
   }
 </style>

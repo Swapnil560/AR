@@ -1,6 +1,7 @@
 <script>
   import { Upload, Eye, Share2, Check, ArrowRight } from "lucide-svelte";
-
+  import photo1 from "../../../lib/assets/Clip path group (1).png";
+  import photo2 from "../../../lib/assets/Clip path group.png";
   const steps = [
     {
       id: 1,
@@ -164,9 +165,29 @@
         {/each}
       </div>
 
-      <div class="testimonial">
+      <!-- <div class="testimonial">
         <p class="quote">"MyAR made our campus fest go viral in 48 hours."</p>
         <p class="byline">— Festival Organizer, Delhi University</p>
+      </div> -->
+
+      <div class="testimonial">
+        <div class="testimonial-content">
+          <!-- Left side: step-styled images -->
+          <div class="testimonial-images steps">
+            <img src={photo2} alt="AR Filter Example 1" class="step-1" />
+            <img src={photo1} alt="AR Filter Example 2" class="step-2" />
+            <img src={photo1} alt="AR Filter Example 3" class="step-3" />
+            <img src={photo1} alt="AR Filter Example 4" class="step-4" />
+          </div>
+
+          <!-- Right side: text -->
+          <div class="testimonial-text">
+            <p class="quote">
+              "MyAR filters are a great addition to our puja. They are really
+              boosting our engagement! 👍🏻"
+            </p>
+          </div>
+        </div>
       </div>
 
       <div class="final-cta">
@@ -749,7 +770,7 @@
   }
 
   /* Testimonial and final CTA */
-  .testimonial {
+  /* .testimonial {
     margin: 3rem 0;
     background: linear-gradient(
       90deg,
@@ -760,17 +781,122 @@
     border-radius: 12px;
     border: 1px solid var(--border);
     text-align: center;
+  } */
+
+  /* Testimonial Wrapper */
+  .testimonial {
+    /* margin: 3rem 0; */
+    background: linear-gradient(
+      90deg,
+      rgba(var(--primary-rgb), 0.04),
+      rgba(var(--accent-rgb), 0.04)
+    );
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--border);
   }
+
+  /* Flexbox for 2-column layout */
+  .testimonial-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8rem;
+    flex-wrap: wrap; /* responsive */
+  }
+
+  /* Step-styled images */
+  .testimonial-images.steps {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .testimonial-images.steps img {
+    width: 160px;
+    border-radius: 16px;
+    /* box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); */
+    object-fit: cover;
+  }
+
+  /* Step effect (each lower than the previous one) */
+  .testimonial-images .step-1 {
+    margin-top: 0;
+  }
+  .testimonial-images .step-2 {
+    margin-top: 20px;
+  }
+  .testimonial-images .step-3 {
+    margin-top: 40px;
+  }
+  .testimonial-images .step-4 {
+    margin-top: 60px;
+  }
+
+  /* Right side text */
+  .testimonial-text {
+    max-width: 400px;
+    text-align: left;
+  }
+
+  .testimonial-text .quote {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  /* .testimonial-text .byline {
+    font-weight: 600;
+    color: var(--text-muted);
+  } */
 
   .quote {
     font-weight: 600;
-    font-size: 1.25rem;
+    font-size: 1rem;
     margin-bottom: 0.5rem;
   }
 
-  .byline {
+  /* .byline {
     color: var(--muted-foreground);
     font-size: 1rem;
+  } */
+
+  /* 📱 Medium + Mobile view: 2 images per row */
+  @media (max-width: 775px) {
+    .testimonial-content {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .testimonial-images.steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr); /* 2 per row */
+      gap: 1rem;
+      justify-items: center;
+    }
+
+    .testimonial-images.steps img {
+      width: 90%; /* make images fill nicely */
+      margin-top: 0; /* remove step effect */
+    }
+
+    .testimonial-text {
+      text-align: center;
+      max-width: 90%;
+    }
+
+    /* Keep staircase effect */
+    .testimonial-images.steps img:nth-child(1) {
+      margin-top: 0;
+    }
+    .testimonial-images.steps img:nth-child(2) {
+      margin-top: 20px;
+    }
+    .testimonial-images.steps img:nth-child(3) {
+      margin-top: 40px;
+    }
+    .testimonial-images.steps img:nth-child(4) {
+      margin-top: 60px;
+    }
   }
 
   .final-cta {

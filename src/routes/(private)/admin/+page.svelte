@@ -51,6 +51,7 @@
 	// Filter details form
 	let filterForm = {
 		name: "",
+		pretext: "",
 		description: "",
 		ai_need: false,
 	};
@@ -295,6 +296,7 @@
 		copySuccess = false;
 		filterForm = {
 			name: "",
+			pretext: "",
 			description: "",
 			ai_need: false,
 		};
@@ -398,6 +400,7 @@
 				user: user.id,
 				filter_url: fullImageUrl,
 				name: filterForm.name.trim(),
+				pretext: filterForm.pretext.trim(),
 				description: filterForm.description.trim(),
 				ai_need: filterForm.ai_need,
 			};
@@ -717,6 +720,20 @@
 						</div>
 
 						<div class="form-group">
+							<label for="filter-pretext" class="form-label"
+								>PreText</label
+							>
+							<textarea
+								id="filter-pretext"
+								bind:value={filterForm.pretext}
+								placeholder="Please enter the pretext for your filter..."
+								rows="3"
+								class="form-textarea"
+								disabled={isUploading}
+							></textarea>
+						</div>
+
+						<div class="form-group">
 							<label for="filter-description" class="form-label"
 								>Description</label
 							>
@@ -823,6 +840,14 @@
 							<span class="summary-label">Filter Name:</span>
 							<span class="summary-value">{filterForm.name}</span>
 						</div>
+						{#if filterForm.pretext}
+							<div class="summary-item">
+								<span class="summary-label">Pretext:</span>
+								<span class="summary-value"
+									>{filterForm.pretext}</span
+								>
+							</div>
+						{/if}
 						{#if filterForm.description}
 							<div class="summary-item">
 								<span class="summary-label">Description:</span>
