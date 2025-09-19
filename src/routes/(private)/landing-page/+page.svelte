@@ -591,7 +591,7 @@
     border: 2px solid white;
   }
 
-  /* Floating cards positioning */
+  /* Floating cards positioning
   .floating {
     position: absolute;
     background: white;
@@ -627,6 +627,150 @@
     }
     .card3 {
       right: 90%;
+    }
+  } */
+
+  /* Floating cards positioning - UPDATED FOR MOBILE RESPONSIVENESS */
+  .floating {
+    position: absolute;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+    animation: float 4s infinite ease-in-out;
+    z-index: 3; /* Increased z-index to ensure cards appear above phone */
+    min-width: 100px;
+  }
+
+  /* Mobile-first positioning - cards above phone */
+  .card1 {
+    top: -5%;
+    right: 5%;
+  }
+
+  .card2 {
+    top: 25%;
+    right: 5%;
+    animation-delay: 1s;
+  }
+
+  .card3 {
+    bottom: -10%;
+    right: 5%;
+    animation-delay: 2s;
+  }
+
+  /* Tablet positioning */
+  @media (min-width: 768px) {
+    .card1 {
+      top: 10%;
+      right: 75%;
+    }
+
+    .card2 {
+      top: 35%;
+      right: 10%;
+    }
+
+    .card3 {
+      bottom: 15%;
+      right: 75%;
+    }
+  }
+
+  /* Desktop positioning */
+  @media (min-width: 1024px) {
+    .card1 {
+      top: 10%;
+      right: 80%;
+    }
+
+    .card2 {
+      top: 35%;
+      right: -8%;
+    }
+
+    .card3 {
+      bottom: 15%;
+      right: 80%;
+    }
+  }
+
+  /* Large desktop positioning */
+  @media (min-width: 1536px) {
+    .card1 {
+      right: 90%;
+    }
+
+    .card3 {
+      right: 90%;
+    }
+  }
+
+  /* Ensure phone has proper z-index */
+  .phone {
+    position: relative;
+    width: 18rem;
+    height: 35rem;
+    margin: 0 auto;
+    border-radius: 3rem;
+    padding: 1rem;
+    background: white;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+    z-index: 2; /* Lower than floating cards */
+  }
+
+  /* Adjust mobile view for better card visibility */
+  @media (max-width: 767px) {
+    .floating {
+      min-width: 80px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+    }
+
+    .right {
+      margin-top: 2rem;
+      margin-bottom: 4rem; /* Add space for floating cards */
+    }
+
+    /* Adjust card positions to ensure they're fully visible */
+    .card1 {
+      top: 10%;
+      right: 70%;
+    }
+
+    .card2 {
+      top: 35%;
+      right: 1%;
+    }
+
+    .card3 {
+      bottom: 15%;
+      right: 70%;
+    }
+  }
+
+  /* For very small screens */
+  @media (max-width: 400px) {
+    .floating {
+      min-width: 70px;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.7rem;
+    }
+    .card1 {
+      top: 10%;
+      right: 70%;
+    }
+
+    .card2 {
+      top: 35%;
+      right: 1%;
+    }
+
+    .card3 {
+      bottom: 15%;
+      right: 70%;
     }
   }
 

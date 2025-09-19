@@ -161,7 +161,7 @@
       localStorage.removeItem("tempUser");
 
       setTimeout(() => {
-        goto("/account-review");
+        goto("/login");
       }, 2000);
     } catch (err) {
       console.error("Save subdomain error:", err);

@@ -1,7 +1,10 @@
 <script>
   import { Upload, Eye, Share2, Check, ArrowRight } from "lucide-svelte";
-  import photo1 from "../../../lib/assets/Clip path group (1).png";
-  import photo2 from "../../../lib/assets/Clip path group.png";
+  import photo1 from "../../../lib/assets/Mask group.png";
+  import photo2 from "../../../lib/assets/Clip path group (3).png";
+  import photo3 from "../../../lib/assets/Clip path group (4).png";
+  import photo4 from "../../../lib/assets/Asob AR filter 2.png";
+  import photo5 from "../../../lib/assets/Asob AR filter (1) 1.png";
   const steps = [
     {
       id: 1,
@@ -174,10 +177,11 @@
         <div class="testimonial-content">
           <!-- Left side: step-styled images -->
           <div class="testimonial-images steps">
-            <img src={photo2} alt="AR Filter Example 1" class="step-1" />
-            <img src={photo1} alt="AR Filter Example 2" class="step-2" />
-            <img src={photo1} alt="AR Filter Example 3" class="step-3" />
-            <img src={photo1} alt="AR Filter Example 4" class="step-4" />
+            <img src={photo1} alt="AR Filter Example 1" class="step-1" />
+            <img src={photo2} alt="AR Filter Example 2" class="step-2" />
+            <img src={photo3} alt="AR Filter Example 3" class="step-3" />
+            <img src={photo4} alt="AR Filter Example 4" class="step-4" />
+            <img src={photo5} alt="AR Filter Example 4" class="step-5" />
           </div>
 
           <!-- Right side: text -->
@@ -785,13 +789,16 @@
 
   /* Testimonial Wrapper */
   .testimonial {
-    /* margin: 3rem 0; */
+    margin: 3rem 0;
     background: linear-gradient(
       90deg,
       rgba(var(--primary-rgb), 0.04),
       rgba(var(--accent-rgb), 0.04)
     );
-    padding: 1rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
     border-radius: 12px;
     border: 1px solid var(--border);
   }
@@ -801,7 +808,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8rem;
+    gap: 4rem;
     flex-wrap: wrap; /* responsive */
   }
 
@@ -809,18 +816,17 @@
   .testimonial-images.steps {
     display: flex;
     align-items: flex-start;
-    gap: 1rem;
   }
 
   .testimonial-images.steps img {
-    width: 160px;
+    width: 150px;
     border-radius: 16px;
     /* box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); */
     object-fit: cover;
   }
 
   /* Step effect (each lower than the previous one) */
-  .testimonial-images .step-1 {
+  /* .testimonial-images .step-1 {
     margin-top: 0;
   }
   .testimonial-images .step-2 {
@@ -831,6 +837,27 @@
   }
   .testimonial-images .step-4 {
     margin-top: 60px;
+  } */
+
+  .testimonial-images .step-1 {
+    transform: scale(0.8);
+    z-index: 1;
+  }
+  .testimonial-images .step-2 {
+    transform: scale(0.9);
+    z-index: 2;
+  }
+  .testimonial-images .step-3 {
+    transform: scale(1.0);
+    z-index: 2;
+  }
+  .testimonial-images .step-4 {
+    transform: scale(1.1);
+    z-index: 2;
+  }
+   .testimonial-images .step-5 {
+    transform: scale(1.2);
+    z-index: 2;
   }
 
   /* Right side text */
@@ -861,7 +888,7 @@
   } */
 
   /* 📱 Medium + Mobile view: 2 images per row */
-  @media (max-width: 775px) {
+  @media (max-width: 850px) {
     .testimonial-content {
       flex-direction: column;
       text-align: center;
@@ -869,7 +896,7 @@
 
     .testimonial-images.steps {
       display: grid;
-      grid-template-columns: repeat(4, 1fr); /* 2 per row */
+      grid-template-columns: repeat(5, 1fr); /* 2 per row */
       gap: 1rem;
       justify-items: center;
     }
@@ -885,18 +912,26 @@
     }
 
     /* Keep staircase effect */
-    .testimonial-images.steps img:nth-child(1) {
-      margin-top: 0;
-    }
-    .testimonial-images.steps img:nth-child(2) {
-      margin-top: 20px;
-    }
-    .testimonial-images.steps img:nth-child(3) {
-      margin-top: 40px;
-    }
-    .testimonial-images.steps img:nth-child(4) {
-      margin-top: 60px;
-    }
+    .testimonial-images .step-1 {
+    transform: scale(0.8);
+    z-index: 1;
+  }
+  .testimonial-images .step-2 {
+    transform: scale(0.9);
+    z-index: 2;
+  }
+  .testimonial-images .step-3 {
+    transform: scale(1.0);
+    z-index: 2;
+  }
+  .testimonial-images .step-4 {
+    transform: scale(1.1);
+    z-index: 2;
+  }
+   .testimonial-images .step-5 {
+    transform: scale(1.2);
+    z-index: 2;
+  }
   }
 
   .final-cta {

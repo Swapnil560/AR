@@ -8,9 +8,9 @@
     if (userData) {
       const user = JSON.parse(userData);
       // Redirect based on user role
-      if (user.id > 420000) {
-        goto("/under-progress");
-      }
+      // if (user.id > 420000) {
+      //   goto("/under-progress");
+      // }
       if (user.role === "admin") {
         goto("/admin");
       } else {
