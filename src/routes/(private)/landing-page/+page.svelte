@@ -2,15 +2,146 @@
   import Footer from "./footer.svelte";
   import HowItWorks from "./HowItWorks.svelte";
   import PricingSection from "./PricingSection.svelte";
-
   import { goto } from "$app/navigation";
+  import { fade, scale } from "svelte/transition";
+  import { saveContact } from "../../../services/actions/user";
+  
+  let showModal = false;
+  let mobileNumber = "";
+  let submitted = false;
+  let errorMsg = "";
+  let isSubmitting = false;
+
+  function openModal() {
+    showModal = true;
+    submitted = false;
+    mobileNumber = "";
+  }
+
+  function closeModal() {
+    showModal = false;
+    submitted = false;
+    mobileNumber = "";
+  }
+
+  function validateMobileNumber(number) {
+    // Remove all non-digit characters
+    const cleanNumber = number.replace(/\D/g, "");
+
+    // Basic validation - adjust for your country
+    if (cleanNumber.length < 10) {
+      return "Mobile number should be at least 10 digits";
+    }
+
+    // Indian mobile number validation (adjust as needed)
+    if (!/^[6-9]\d{9}$/.test(cleanNumber)) {
+      return "Please enter a valid mobile number";
+    }
+
+    return null;
+  }
+
+  async function handleSubmit() {
+    const validationError = validateMobileNumber(mobileNumber);
+    if (validationError) {
+      errorMsg = validationError;
+      return;
+    }
+
+    if (!mobileNumber.trim()) {
+      errorMsg = "Please enter a mobile number";
+      return;
+    }
+
+    isSubmitting = true;
+    errorMsg = null;
+
+    try {
+      const cleanNumber = mobileNumber.replace(/\D/g, "");
+
+      const body = {
+        mobileNumber: cleanNumber, // ✅ add mobile number here
+      };
+
+      const saveRes = await saveContact(body); // ✅ call saveContact instead of messageSubmit
+
+      console.log("Contact saved successfully:", saveRes.result);
+      submitted = true;
+
+      setTimeout(() => {
+        closeModal();
+      }, 3000);
+    } catch (error) {
+      console.error("Error saving contact:", error);
+      errorMsg = "Unexpected error occurred. Please try again.";
+      submitted = true;
+
+      setTimeout(() => {
+        closeModal();
+      }, 3000);
+    } finally {
+      isSubmitting = false;
+    }
+  }
+
+  // Handle escape key to close modal
+  function handleKeydown(event) {
+    if (event.key === "Escape") {
+      closeModal();
+    }
+  }
 
   function handleLogin() {
     goto("/login");
   }
 </script>
 
+<svelte:window on:keydown={handleKeydown} />
+
 <div class="page">
+  <!-- Modal -->
+  {#if showModal}
+    <div
+      class="modal-overlay"
+      on:click={closeModal}
+      transition:fade={{ duration: 200 }}
+    >
+      <div
+        class="modal-content"
+        on:click|stopPropagation
+        transition:scale={{ duration: 300 }}
+      >
+        {#if !submitted}
+          <div class="modal-header">
+            <h3>Get Started with MyAR.in</h3>
+            <button class="close-btn" on:click={closeModal}>×</button>
+          </div>
+
+          <div class="modal-body">
+            <label class="modal-label">Please share your contact number</label>
+            <input
+              type="tel"
+              class="mobile-input"
+              placeholder="Enter your mobile number"
+              bind:value={mobileNumber}
+              on:keydown={(e) => e.key === "Enter" && handleSubmit()}
+            />
+            <button class="submit-btn" on:click={handleSubmit}> Submit </button>
+          </div>
+        {:else}
+          <div class="success-message">
+            <div class="success-icon">✓</div>
+            <h3>Thank You!</h3>
+            <p>
+              Thank you for your interest in MyAR.in. We are working on creating
+              your awesome account.
+            </p>
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
   <!-- Hero Section -->
   <section class="hero">
     <!-- Background Pattern -->
@@ -27,7 +158,7 @@
         <a href="/landing-page" style="text-decoration: none;">
           <div class="logo gradient">myAR.in</div>
         </a>
-        <button class="btn primary">Contact Us</button>
+        <button class="btn primary" on:click={openModal}>Contact Us</button>
       </div>
     </header>
 
@@ -54,7 +185,9 @@
         </div>
 
         <div class="buttons">
-          <button class="btn primary">Start Creating</button>
+          <button class="btn primary" on:click={openModal}
+            >Start Creating</button
+          >
           <button class="btn secondary">Watch Demo</button>
         </div>
 
@@ -133,6 +266,136 @@
 </div>
 
 <style>
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 1rem;
+    padding: 0;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    position: relative;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 1.5rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 0.25rem;
+    line-height: 1;
+  }
+
+  .close-btn:hover {
+    color: #374151;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .modal-label {
+    display: block;
+    margin-bottom: 1rem;
+    font-weight: 500;
+    color: #374151;
+    text-align: center;
+    font-size: 1rem;
+  }
+
+  .mobile-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+    transition: border-color 0.3s;
+    box-sizing: border-box;
+  }
+
+  .mobile-input:focus {
+    outline: none;
+    border-color: #6366f1;
+  }
+
+  .submit-btn {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(to right, #6366f1, #9333ea);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+
+  .submit-btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .success-message {
+    padding: 2rem 1.5rem;
+    text-align: center;
+  }
+
+  .success-icon {
+    width: 4rem;
+    height: 4rem;
+    background: linear-gradient(to right, #10b981, #34d399);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 1rem;
+  }
+
+  .success-message h3 {
+    margin: 0 0 1rem;
+    color: #111827;
+    font-size: 1.25rem;
+  }
+
+  .success-message p {
+    margin: 0;
+    color: #6b7280;
+    line-height: 1.5;
+  }
+
   /* Global container for consistent width */
   .container {
     width: 100%;

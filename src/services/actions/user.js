@@ -8,6 +8,16 @@ export async function saveUser(body) {
 	return response;
 }
 
+
+export async function saveContact(body) {
+  console.log("here??");
+  const response = await Api.post("/contacts", {
+    body,
+  });
+  console.log(response);
+  return response;
+}
+
 // Get Users with optional pagination
 export const getUsers = ({ search = "", page = "", sort = "" }) => {
 	const params = {};

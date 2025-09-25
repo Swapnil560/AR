@@ -294,7 +294,7 @@
   }
 
   .step {
-    /* display: flex; */
+    display: flex;
     gap: 1.5rem;
     align-items: flex-start;
   }
@@ -1071,9 +1071,9 @@
     }
 
     .step {
-      flex-direction: column;
+      /* flex-direction: column;
       align-items: center;
-      text-align: center;
+      text-align: center; */
       gap: 1rem;
     }
 
@@ -1082,7 +1082,7 @@
     }
 
     .step-head {
-      align-items: center;
+      /* align-items: center; */
     }
 
     .illustration-card {

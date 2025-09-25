@@ -1499,6 +1499,7 @@
       console.error("Error in shareContent:", e);
     }
     const CAPTION = dynamicCaption;
+     console.log("Final caption being shared:", CAPTION);
 
     // Best-effort: copy caption to clipboard before invoking share (so users can paste if app ignores it)
     let captionCopied = false;
@@ -2385,31 +2386,31 @@
     <div class="camera-fullscreen">
       <!-- Top Controls -->
       <!-- <div class="top-controls">
-				<div></div>
-				<div class="mode-toggle"> -->
-      <!-- <button
-						class="mode-btn {isPhotoMode ? 'active' : ''}"
-						on:click={() => toggleMode()}
-						disabled={isRecording}
-					>
-						PHOTO
-					</button> -->
-      <!-- <button
-						class="mode-btn {!isPhotoMode ? 'active' : ''}"
-						on:click={() => toggleMode()}
-						disabled={isRecording}
-					>
-						VIDEO
-					</button> -->
-      <!-- </div>
-				<button
-					class="control-btn close-btn"
-					on:click={() => window.history.back()}
-					on:touchstart={() => window.history.back()}
-				>
-					<span class="control-icon">✕</span>
-				</button>
-			</div> -->
+        <div></div>
+        <div class="mode-toggle">
+          <button
+            class="mode-btn {isPhotoMode ? 'active' : ''}"
+            on:click={() => toggleMode()}
+            disabled={isRecording}
+          >
+            PHOTO
+          </button>
+          <button
+            class="mode-btn {!isPhotoMode ? 'active' : ''}"
+            on:click={() => toggleMode()}
+            disabled={isRecording}
+          >
+            VIDEO
+          </button>
+        </div>
+        <button
+          class="control-btn close-btn"
+          on:click={() => window.history.back()}
+          on:touchstart={() => window.history.back()}
+        >
+          <span class="control-icon">✕</span>
+        </button>
+      </div> -->
 
       <!-- Camera View -->
       <div class="camera-view">
@@ -2764,6 +2765,7 @@
 
   .top-controls {
     position: absolute;
+    height: 10%;
     top: 0;
     left: 0;
     right: 0;
@@ -2771,8 +2773,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: env(safe-area-inset-top, 20px) 20px 20px 20px;
-    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent);
+    padding: env(safe-area-inset-top, 10px) 10px 10px 10px;
+    background: black;
   }
 
   .control-btn {
@@ -2958,12 +2960,14 @@
   /* Bottom Controls */
   .bottom-controls {
     position: absolute;
+    height: 12%;
+
     bottom: 0;
     left: 0;
     right: 0;
     z-index: 20;
-    padding: 20px 20px calc(env(safe-area-inset-bottom, 20px) + 20px) 20px;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+    padding: 5px 5px calc(env(safe-area-inset-bottom, 5px) + 5px) 5px;
+    background: black;
   }
 
   .capture-controls {
