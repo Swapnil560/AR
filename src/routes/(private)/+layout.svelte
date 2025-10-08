@@ -8,7 +8,8 @@
   onMount(() => {
     // Allow the login page itself!
     // if (["/login", "/account-review","under-progress"].includes(window.location.pathname)) return;
-    if (["/login"].includes(window.location.pathname)) return;
+    // Allow public landing page to render without forcing login
+    if (["/login", "/landing-page"].includes(window.location.pathname)) return;
 
     user = localStorage.getItem("user");
     if (!user) goto("/landing-page");

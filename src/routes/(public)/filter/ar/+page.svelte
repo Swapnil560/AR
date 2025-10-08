@@ -17,9 +17,9 @@
   const FILTER_BASE_URL =
     "https://uploads.backendservices.in/storage/arodos/rong-digital/filters/";
 
-  let videoRef;
-  let canvasRef;
-  let overlayCanvasRef; // Canvas for face tracking overlays
+  let videoRef: HTMLVideoElement;
+  let canvasRef: HTMLCanvasElement;
+  let overlayCanvasRef: HTMLCanvasElement; // Canvas for face tracking overlays
   let filterUrl: string | null = null;
   let capturedImg: string | null = null;
   let recordedVideo: string | null = null;
@@ -42,8 +42,8 @@
   let showPreview = false; // Show preview after capture
   let isCameraActive = true; // Track camera state
   let showFiltersModal = false; // Show filters modal
-  let userFilters = []; // Store user's filters
-  let currentUserId = null; // Store current user ID
+  let userFilters: any[] = []; // Store user's filters
+  let currentUserId: string | null = null; // Store current user ID
   let isFlashOn = false; // Track flash state
   let isProcessingVideo = false; // Track video processing state
 
@@ -52,15 +52,16 @@
   let countdownInterval: number | null = null; // Store interval ID
 
   // Face tracking variables
-  let faceMesh = null;
+  let faceMesh: any = null;
   let mediaPipeCamera = null;
   let showAdditionalFiltersModal = false;
-  let selectedAdditionalFilter = null;
+  let selectedAdditionalFilter: string | null = null;
   let faceDetections = [];
-  let animationFrameId = null;
+  let animationFrameId: number | null = null;
   let isFaceTrackingRunning = false; // ensure only one RAF loop
   let isFaceMeshBusy = false; // prevent concurrent faceMesh.send
-  let dynamicCaption = "Festive mood: ON 🔥 Can't wait for #ASoBPuja"; // Default fallback
+  // let dynamicCaption = "Festive mood: ON 🔥 Can't wait for #ASoBPuja"; // Default fallback
+  let dynamicCaption = "";
 
   // Pin MediaPipe CDN version to avoid asset mismatches
   const MEDIAPIPE_FACE_MESH_VERSION = "0.4.1633559619";
@@ -388,7 +389,7 @@
   }
 
   // Handle face detection results
-  function onFaceResults(results) {
+  function onFaceResults(results: any) {
     if (!overlayCanvasRef || !videoRef) return;
 
     const overlayCtx = overlayCanvasRef.getContext("2d");
@@ -400,7 +401,7 @@
     overlayCanvasRef.height = displayHeight;
 
     // Clear previous drawings
-    overlayCtx.clearRect(0, 0, displayWidth, displayHeight);
+    overlayCtx?.clearRect(0, 0, displayWidth, displayHeight);
 
     if (
       results.multiFaceLandmarks &&
@@ -413,7 +414,12 @@
   }
 
   // Draw additional filter based on face landmarks with advanced tracking
-  function drawAdditionalFilter(ctx, landmarks, width, height) {
+  function drawAdditionalFilter(
+    ctx: any,
+    landmarks: any[],
+    width: number,
+    height: number
+  ) {
     if (!selectedAdditionalFilter) return;
 
     const filter = additionalFilters.find(
@@ -1138,7 +1144,7 @@
       }
 
       // Pre-load the filter image if it exists (use cached version if available)
-      let filterImage = null;
+      let filterImage: any | null = null;
       if (filterUrl) {
         if (preloadedFilterImage) {
           // Use the preloaded image for instant access
@@ -1293,7 +1299,7 @@
         try {
           if (recordedChunks.length > 0) {
             const blob = new Blob(recordedChunks, {
-              type: mediaRecorder.mimeType || "video/webm",
+              type: mediaRecorder?.mimeType || "video/webm",
             });
 
             // Validate blob size before proceeding
@@ -1388,8 +1394,8 @@
       setTimeout(() => {
         try {
           console.log("Starting MediaRecorder...");
-          mediaRecorder.start(100); // Smaller timeslices for better mobile compatibility
-          console.log("MediaRecorder started with state:", mediaRecorder.state);
+          mediaRecorder?.start(100); // Smaller timeslices for better mobile compatibility
+          console.log("MediaRecorder started with state:", mediaRecorder?.state);
         } catch (error) {
           console.error("Failed to start MediaRecorder:", error);
           isRecording = false;
@@ -1430,7 +1436,7 @@
           console.log("Resuming and stopping MediaRecorder...");
           mediaRecorder.resume();
           setTimeout(() => {
-            if (mediaRecorder.state === "recording") {
+            if (mediaRecorder?.state === "recording") {
               mediaRecorder.stop();
             }
           }, 100);
@@ -1442,7 +1448,7 @@
           // Force trigger onstop if we have chunks
           if (recordedChunks.length > 0) {
             setTimeout(() => {
-              if (mediaRecorder.onstop) {
+              if (mediaRecorder?.onstop) {
                 mediaRecorder.onstop();
               }
             }, 100);
@@ -1473,591 +1479,164 @@
     console.log("capturedImg:", !!capturedImg);
     console.log("recordedVideo:", !!recordedVideo);
 
-    // Consistent caption across platforms (many apps ignore text when files are attached)
-    // const CAPTION = "Festive mood: ON 🔥 Can't wait for #ASoBPuja";
     try {
       const response = await getFiltersByUser({ userId: currentUserId });
-      console.log("API Response:", response, filterUrl); // Debug log
-      if (response && response.result && response.result.length > 0) {
-        console.log("User Filters:", response.result); // Debug log
+      if (response?.result?.length > 0) {
         const userFilters = response.result;
-        const activeFilter = userFilters.find(
-          (a) => a.filter_url === filterUrl
-        );
-        console.log("Active Filter:", activeFilter); // Debug log
-        if (activeFilter && activeFilter.pretext) {
-          dynamicCaption =
-            activeFilter.pretext + " : " + activeFilter.description;
-          console.log("Using dynamic caption:", dynamicCaption);
-        } else {
-          console.log("No caption found for active filter, using default.");
+        const activeFilter = userFilters.find((a) => a.filter_url === filterUrl);
+        if (activeFilter?.pretext) {
+          dynamicCaption = `${activeFilter.pretext} \n${activeFilter.description}`;
         }
-      } else {
-        console.log("No user filters found, using default caption.");
       }
     } catch (e) {
-      console.error("Error in shareContent:", e);
+      console.error("Error fetching filters:", e);
     }
-    const CAPTION = dynamicCaption;
-     console.log("Final caption being shared:", CAPTION);
 
-    // Best-effort: copy caption to clipboard before invoking share (so users can paste if app ignores it)
-    let captionCopied = false;
-    const copyCaption = async (text) => {
+    const CAPTION = dynamicCaption || "";
+    console.log("Final caption:", CAPTION);
+
+    const copyCaption = async (text: string) => {
       try {
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(text);
           return true;
         }
-        // Fallback for older iOS/Android
         const textarea = document.createElement("textarea");
         textarea.value = text;
-        textarea.setAttribute("readonly", "");
         textarea.style.position = "absolute";
         textarea.style.left = "-9999px";
         document.body.appendChild(textarea);
         textarea.select();
-        const ok = document.execCommand("copy");
+        document.execCommand("copy");
         document.body.removeChild(textarea);
-        return ok;
-      } catch (_) {
+        return true;
+      } catch {
         return false;
       }
     };
+    await copyCaption(CAPTION);
 
-    captionCopied = await copyCaption(dynamicCaption);
-
-    // Enhanced platform detection with better mobile device recognition
-    const ua = navigator.userAgent.toLowerCase();
-    const isAndroid =
-      /android/.test(ua) || (/mobile/.test(ua) && /android/.test(ua));
-    const isIOS =
-      /iphone|ipad|ipod/.test(ua) ||
-      (/mac/.test(ua) && "ontouchend" in document);
-    const isMobile =
-      isAndroid ||
-      isIOS ||
-      /mobile|tablet|phone|android|iphone|ipad|ipod|blackberry|opera mini|iemobile/.test(
-        ua
-      );
-    const isChrome = /chrome/.test(ua) && !/edg/.test(ua);
-    const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
-    const isFirefox = /firefox/.test(ua);
-
-    // Check file size limits (mobile browsers have different limits)
-    const maxFileSize = isMobile ? 25 * 1024 * 1024 : 100 * 1024 * 1024; // 25MB mobile, 100MB desktop
-
+    // Build media file if available
+    let files: File[] = [];
     try {
       if (capturedImg) {
-        // Convert data URL to blob
-        const response = await fetch(capturedImg);
-        const blob = await response.blob();
-
-        // For mobile, ensure proper file format and size
-        let finalBlob = blob;
-        let fileName = "rongcam-photo.png";
-
-        if (isMobile) {
-          // Mobile-specific optimizations
-          try {
-            // Convert to JPEG for better mobile compatibility if image is large
-            if (blob.size > 2 * 1024 * 1024) {
-              // If larger than 2MB
-              const canvas = document.createElement("canvas");
-              const ctx = canvas.getContext("2d");
-              const img = new Image();
-
-              await new Promise((resolve, reject) => {
-                img.onload = () => {
-                  // Resize for mobile if needed
-                  const maxDimension = 1920;
-                  let { width, height } = img;
-
-                  if (width > maxDimension || height > maxDimension) {
-                    if (width > height) {
-                      height = (height * maxDimension) / width;
-                      width = maxDimension;
-                    } else {
-                      width = (width * maxDimension) / height;
-                      height = maxDimension;
-                    }
-                  }
-
-                  canvas.width = width;
-                  canvas.height = height;
-                  ctx.drawImage(img, 0, 0, width, height);
-
-                  canvas.toBlob(
-                    (optimizedBlob) => {
-                      if (optimizedBlob) {
-                        finalBlob = optimizedBlob;
-                        fileName = "rongcam-photo.jpg";
-                      }
-                      resolve();
-                    },
-                    "image/jpeg",
-                    0.85
-                  );
-                };
-                img.onerror = reject;
-                img.src = capturedImg;
-              });
-            }
-          } catch (optimizationError) {
-            console.log(
-              "Image optimization failed, using original:",
-              optimizationError
-            );
-          }
-        }
-
-        const file = new File([finalBlob], fileName, {
-          type: finalBlob.type,
-        });
-
-        // Try Web Share API first, but with mobile-specific handling
-        if (
-          navigator.share &&
-          navigator.canShare &&
-          navigator.canShare({ files: [file] })
-        ) {
-          try {
-            await navigator.share({
-              title: "MyAR Photo",
-              text: CAPTION,
-              files: [file],
-            });
-            console.log("Successfully shared photo via Web Share API");
-            return; // Exit if successful
-          } catch (shareError) {
-            console.log("Web Share API failed:", shareError);
-            // Continue to fallback method
-          }
-        } else {
-          // Fallback: download the image and open WhatsApp
-          const link = document.createElement("a");
-          link.href = capturedImg;
-          link.download = "rongcam-photo.png";
-          link.click();
-
-          // Enhanced WhatsApp opening for photos
-          setTimeout(() => {
-            try {
-              if (isMobile) {
-                if (isAndroid) {
-                  // Android: Use intent-based approach
-                  const whatsappIntentUrl = `intent://send?text=${encodeURIComponent(CAPTION)}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
-                  try {
-                    window.location.href = whatsappIntentUrl;
-                  } catch (intentError) {
-                    window.open(
-                      `whatsapp://send?text=${encodeURIComponent(CAPTION)}`,
-                      "_blank"
-                    );
-                  }
-                } else if (isIOS) {
-                  // iOS: Use universal link
-                  window.location.href = `whatsapp://send?text=${encodeURIComponent(CAPTION)}`;
-                }
-
-                // Fallback to web version after delay
-                setTimeout(() => {
-                  if (document.hasFocus()) {
-                    window.open(
-                      `https://wa.me/?text=${encodeURIComponent(CAPTION)}`,
-                      "_blank"
-                    );
-                  }
-                }, 2000);
-              } else {
-                // Desktop: Direct to web version
-                window.open(
-                  `https://wa.me/?text=${encodeURIComponent(CAPTION)}`,
-                  "_blank"
-                );
-              }
-            } catch (error) {
-              console.log("WhatsApp open failed for photo:", error);
-              // Final fallback
-              window.open(
-                `https://wa.me/?text=${encodeURIComponent(CAPTION)}`,
-                "_blank"
-              );
-            }
-          }, 300);
-        }
+        const imgBlob = await (await fetch(capturedImg)).blob();
+        const imgType = imgBlob.type || "image/png";
+        files = [new File([imgBlob], "photo.png", { type: imgType })];
       } else if (recordedVideo) {
-        console.log("Attempting to share video");
+        const videoBlob = await (await fetch(recordedVideo)).blob();
+        const videoType = videoBlob.type || "video/webm";
+        files = [new File([videoBlob], "video.webm", { type: videoType })];
+      }
+    } catch (e) {
+      console.warn("Failed creating File for share:", e);
+    }
 
-        // Convert video blob to proper format for mobile sharing
-        const response = await fetch(recordedVideo);
-        const originalBlob = await response.blob();
-        console.log(
-          "Original video blob size:",
-          originalBlob.size,
-          "type:",
-          originalBlob.type
-        );
+    // Prefer Web Share API with files
+    try {
+      if (files.length && navigator.share && navigator.canShare?.({ files })) {
+        await navigator.share({ title: "MyAR", text: CAPTION, files });
+        console.log("Shared via Web Share API with files");
+        return;
+      }
+    } catch (err) {
+      console.log("Web Share API sharing failed, using fallbacks:", err);
+    }
 
-        // Check file size before proceeding
-        if (originalBlob.size > maxFileSize) {
-          console.warn("Video file too large for sharing:", originalBlob.size);
-          // Force download for large files
-          const link = document.createElement("a");
-          link.href = recordedVideo;
-          link.download = "rongcam-video.webm";
-          link.click();
+    // Platform detection
+    const ua = navigator.userAgent.toLowerCase();
+    const isAndroid = /android/.test(ua);
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isWindows = /windows/.test(ua);
 
-          // Still try to open WhatsApp for manual sharing with improved error handling
+    // Helper: trigger media download so the user can attach manually
+    const triggerDownload = async () => {
+      try {
+        if (capturedImg) {
+          const a = document.createElement("a");
+          a.href = capturedImg;
+          a.download = `myar-photo-${Date.now()}.png`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        } else if (recordedVideo) {
+          const a = document.createElement("a");
+          a.href = recordedVideo;
+          a.download = `myar-video-${Date.now()}.webm`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
+      } catch (e) {
+        console.warn("Auto-download failed:", e);
+      }
+    };
+
+    try {
+      if (!capturedImg && !recordedVideo) {
+        alert("No photo or video to share. Capture something first!");
+        return;
+      }
+
+      // WhatsApp best-effort fallbacks (note: web cannot attach media directly without Web Share)
+      const whatsappText = encodeURIComponent(CAPTION);
+      const openWhatsApp = () => {
+        if (isAndroid) {
+          const intentUrl = `intent://send?text=${whatsappText}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+          window.location.href = intentUrl;
           setTimeout(() => {
-            try {
-              if (isMobile) {
-                if (isAndroid) {
-                  // Android: Use multiple approaches for better reliability
-                  const whatsappIntentUrl = `intent://send?text=${encodeURIComponent(CAPTION)}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
-                  const whatsappAppUrl = `whatsapp://send?text=${encodeURIComponent(CAPTION)}`;
-                  const whatsappWebUrl = `https://wa.me/?text=${encodeURIComponent(CAPTION)}`;
-
-                  try {
-                    window.location.href = whatsappIntentUrl;
-                  } catch (intentError) {
-                    try {
-                      window.open(whatsappAppUrl, "_blank");
-                    } catch (appError) {
-                      window.open(whatsappWebUrl, "_blank");
-                    }
-                  }
-
-                  // Fallback to web version after delay if needed
-                  setTimeout(() => {
-                    if (document.hasFocus()) {
-                      window.open(whatsappWebUrl, "_blank");
-                    }
-                  }, 1500);
-                } else if (isIOS) {
-                  // iOS: Better universal link handling
-                  const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(CAPTION)}`;
-                  const whatsappWebUrl = `https://wa.me/?text=${encodeURIComponent(CAPTION)}`;
-
-                  try {
-                    window.location.href = whatsappUrl;
-
-                    // iOS fallback with visibility detection
-                    setTimeout(() => {
-                      if (document.hasFocus()) {
-                        window.open(whatsappWebUrl, "_blank");
-                      }
-                    }, 2000);
-                  } catch (iosError) {
-                    window.open(whatsappWebUrl, "_blank");
-                  }
-                }
-              } else {
-                // Desktop: WhatsApp Web
-                window.open(
-                  `https://web.whatsapp.com/send?text=${encodeURIComponent(CAPTION)}`,
-                  "_blank"
-                );
-              }
-            } catch (e) {
-              console.log("WhatsApp open failed:", e);
-              // Final fallback: web version
-              try {
-                window.open(
-                  `https://wa.me/?text=${encodeURIComponent(CAPTION)}`,
-                  "_blank"
-                );
-              } catch (finalError) {
-                console.error("All WhatsApp methods failed:", finalError);
-              }
-            }
+            window.open(`whatsapp://send?text=${whatsappText}`, "_blank");
           }, 500);
           return;
         }
+        if (isIOS) {
+          window.location.href = `whatsapp://send?text=${whatsappText}`;
+          setTimeout(() => {
+            if (document.hasFocus()) {
+              window.open(`https://wa.me/?text=${whatsappText}`, "_blank");
+            }
+          }, 1200);
+          return;
+        }
+        window.open(`https://wa.me/?text=${whatsappText}`, "_blank");
+      };
 
-        // Keep original format and MIME type - with mobile optimization
-        let fileName = "rongcam-video.webm";
-        let mimeType = originalBlob.type || "video/webm";
-        let finalBlob = originalBlob;
-
-        // Mobile-specific video handling
-        if (isMobile) {
-          // For mobile, prefer MP4 format as it's more widely supported
-          if (originalBlob.type.includes("webm")) {
-            fileName = "rongcam-video.webm";
-            mimeType = "video/webm";
-
-            // Note: We keep the original blob but change the filename and mimetype
-            // Most mobile apps can handle WebM data with MP4 extension
-            finalBlob = new Blob([originalBlob], {
-              type: "video/webm",
-            });
-          } else if (originalBlob.type.includes("webm")) {
-            fileName = "rongcam-video.webm";
-            mimeType = "video/webm";
-          }
-
-          // Ensure file size is mobile-friendly
-          if (finalBlob.size > 15 * 1024 * 1024) {
-            // 15MB limit for mobile
-            console.warn(
-              "Video file large for mobile sharing:",
-              finalBlob.size
-            );
-          }
+      // Facebook share (cannot pre-attach files; can only share a URL and text)
+      const openFacebook = () => {
+        const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+          window.location.href
+        )}&quote=${encodeURIComponent(CAPTION)}`;
+        if (isIOS) {
+          window.location.href = url;
         } else {
-          // Desktop: keep original format
-          if (originalBlob.type.includes("webm")) {
-            fileName = "rongcam-video.webm";
-            mimeType = "video/webm";
-          } else if (originalBlob.type.includes("webm")) {
-            fileName = "rongcam-video.webm";
-            mimeType = "video/webm";
-          }
+          window.open(url, "_blank", "width=600,height=500");
         }
+      };
 
-        console.log("Final file name:", fileName, "MIME type:", mimeType);
-        console.log("Final blob size:", finalBlob.size);
-
-        const file = new File([finalBlob], fileName, {
-          type: mimeType,
-        });
-
-        console.log("File created:", file.name, file.size, file.type);
-
-        // Enhanced sharing logic with mobile-specific handling
-        if (navigator.share) {
-          console.log("Web Share API is available");
-
-          // Check if device can share files with special mobile handling
-          let canShareFiles = false;
-          try {
-            if (isMobile) {
-              // On mobile, be more conservative with file sharing
-              canShareFiles =
-                navigator.canShare && navigator.canShare({ files: [file] });
-
-              // Additional check for mobile file size limits
-              if (canShareFiles && file.size > 10 * 1024 * 1024) {
-                // 10MB mobile limit
-                console.log("File too large for mobile Web Share API");
-                canShareFiles = false;
-              }
-            } else {
-              canShareFiles =
-                navigator.canShare && navigator.canShare({ files: [file] });
-            }
-          } catch (e) {
-            console.log("Error checking canShare:", e);
-            canShareFiles = false;
-          }
-
-          if (canShareFiles) {
-            console.log("Device can share files with Web Share API");
-            try {
-              await navigator.share({
-                title: "MyAR Video",
-                text: CAPTION,
-                files: [file],
-              });
-              console.log("Successfully shared via Web Share API");
-              return; // Exit function if sharing was successful
-            } catch (shareError) {
-              console.log("Share API failed, trying fallbacks:", shareError);
-
-              // On mobile, if Web Share API fails, skip to download + WhatsApp
-              if (isMobile) {
-                console.log(
-                  "Mobile Web Share failed, using download + WhatsApp method"
-                );
-              }
-            }
-          } else {
-            console.log(
-              "Cannot share files with Web Share API - using fallback"
-            );
-          }
+      // Instagram share (no official web share; open site/app and instruct user)
+      const openInstagram = () => {
+        const url = `https://www.instagram.com/`;
+        if (isIOS) {
+          window.location.href = url;
+        } else {
+          window.open(url, "_blank", "width=600,height=500");
         }
+      };
 
-        // Primary fallback: download the video and open WhatsApp
-        console.log("Using primary fallback: download + WhatsApp sharing");
+      // Download media so user can attach in app, and inform about caption
+      await triggerDownload();
 
-        // Download the video first
-        const link = document.createElement("a");
-        link.href = recordedVideo;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      alert(
+        "Caption copied to clipboard. Media downloaded. Open the app and paste the caption when you attach the media."
+      );
 
-        // For mobile, try text-only sharing first if available
-        if (isMobile && navigator.share) {
-          try {
-            console.log("Trying mobile text-only share before WhatsApp");
-            await navigator.share({
-              title: "MyAR Video",
-              text: `${CAPTION}\n\nVideo downloaded to your device. You can now share it manually through WhatsApp or other apps.`,
-            });
-            console.log("Text-only share successful");
-            return; // Exit if text sharing worked
-          } catch (textShareError) {
-            console.log(
-              "Text-only share failed, proceeding to WhatsApp:",
-              textShareError
-            );
-            // Continue to WhatsApp method
-          }
-        }
-
-        // Enhanced WhatsApp sharing with better mobile support and error handling
-        setTimeout(() => {
-          try {
-            if (isMobile) {
-              if (isAndroid) {
-                // Android: Use intent-based approach for better reliability
-                console.log("Attempting Android WhatsApp sharing");
-
-                // Try multiple WhatsApp URL schemes for Android
-                const whatsappIntentUrl = `intent://send?text=${encodeURIComponent(CAPTION)}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
-                const whatsappAppUrl = `whatsapp://send?text=${encodeURIComponent(CAPTION)}`;
-                const whatsappWebUrl = `https://wa.me/?text=${encodeURIComponent(CAPTION)}`;
-
-                // First try intent URL (most reliable on Android)
-                try {
-                  window.location.href = whatsappIntentUrl;
-
-                  // Fallback to app URL after short delay
-                  setTimeout(() => {
-                    try {
-                      const appWindow = window.open(whatsappAppUrl, "_blank");
-
-                      // If that fails, try web version
-                      setTimeout(() => {
-                        if (!appWindow || appWindow.closed) {
-                          console.log(
-                            "WhatsApp app not available, opening web version"
-                          );
-                          window.open(whatsappWebUrl, "_blank");
-                        }
-                      }, 1500);
-                    } catch (e) {
-                      console.log("App URL failed, trying web version");
-                      window.open(whatsappWebUrl, "_blank");
-                    }
-                  }, 1000);
-                } catch (intentError) {
-                  console.log("Intent URL failed, trying app URL");
-                  try {
-                    window.open(whatsappAppUrl, "_blank");
-                  } catch (appError) {
-                    console.log("App URL failed, opening web version");
-                    window.open(whatsappWebUrl, "_blank");
-                  }
-                }
-              } else if (isIOS) {
-                // iOS: Use universal links with better error handling
-                console.log("Attempting iOS WhatsApp sharing");
-
-                const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(CAPTION)}`;
-                const whatsappWebUrl = `https://wa.me/?text=${encodeURIComponent(CAPTION)}`;
-
-                // Try to open WhatsApp app
-                try {
-                  window.location.href = whatsappUrl;
-
-                  // Set up fallback mechanism
-                  let fallbackTriggered = false;
-                  const fallbackTimer = setTimeout(() => {
-                    if (!fallbackTriggered && document.hasFocus()) {
-                      fallbackTriggered = true;
-                      console.log(
-                        "WhatsApp app not available, opening web version"
-                      );
-                      window.open(whatsappWebUrl, "_blank");
-                    }
-                  }, 2500);
-
-                  // Clear fallback if page loses focus (app opened)
-                  const visibilityHandler = () => {
-                    if (document.hidden && !fallbackTriggered) {
-                      fallbackTriggered = true;
-                      clearTimeout(fallbackTimer);
-                      console.log("WhatsApp app opened successfully");
-                    }
-                  };
-
-                  document.addEventListener(
-                    "visibilitychange",
-                    visibilityHandler,
-                    { once: true }
-                  );
-
-                  // Cleanup listener after timeout
-                  setTimeout(() => {
-                    document.removeEventListener(
-                      "visibilitychange",
-                      visibilityHandler
-                    );
-                  }, 3000);
-                } catch (iosError) {
-                  console.log("iOS WhatsApp URL failed, opening web version");
-                  window.open(whatsappWebUrl, "_blank");
-                }
-              }
-            } else {
-              // Desktop: WhatsApp Web
-              console.log("Opening WhatsApp Web for desktop");
-              window.open(
-                `https://web.whatsapp.com/send?text=${encodeURIComponent(CAPTION)}`,
-                "_blank"
-              );
-            }
-          } catch (whatsappError) {
-            console.error("WhatsApp sharing error:", whatsappError);
-            // Final fallback: always try web version
-            try {
-              console.log("Using final fallback: WhatsApp Web");
-              window.open(
-                `https://wa.me/?text=${encodeURIComponent(CAPTION)}`,
-                "_blank"
-              );
-            } catch (finalError) {
-              console.error("Final WhatsApp fallback failed:", finalError);
-              // Silent fail - file was already downloaded
-            }
-          }
-        }, 800); // Delay to ensure download starts first
-      } else {
-        console.log("No content available to share");
-        alert("No photo or video to share. Please capture something first!");
-      }
-    } catch (error) {
-      console.error("Error sharing:", error);
-      // Ultimate fallback: download the file and provide WhatsApp instructions
-      try {
-        if (capturedImg) {
-          const link = document.createElement("a");
-          link.href = capturedImg;
-          link.download = "rongcam-photo.png";
-          link.click();
-        } else if (recordedVideo) {
-          const response = await fetch(recordedVideo);
-          const blob = await response.blob();
-
-          // Determine file name based on blob type
-          let fileName = "rongcam-video.webm";
-          if (blob.type && blob.type.includes("webm")) {
-            fileName = "rongcam-video.webm";
-          }
-
-          const link = document.createElement("a");
-          link.href = recordedVideo;
-          link.download = fileName;
-          link.click();
-        }
-      } catch (downloadError) {
-        console.error("Download fallback failed:", downloadError);
-      }
+      // Try opening targets to assist the user
+      openWhatsApp();
+      openFacebook();
+      openInstagram();
+    } catch (err) {
+      console.error("Final share error:", err);
+      alert("Failed to share content. Please try again.");
     }
   }
 
@@ -2103,7 +1682,7 @@
   }
 
   // Preload user filter images for faster switching
-  async function preloadUserFilters(filters) {
+  async function preloadUserFilters(filters: any) {
     for (const filter of filters) {
       try {
         const imageUrl = getFilterImageUrl(filter);
@@ -2121,7 +1700,7 @@
   }
 
   // Function to try a specific filter
-  async function tryFilter(filter) {
+  async function tryFilter(filter: any) {
     console.log("Trying filter:", filter); // Debug log
     console.log("Available filter fields:", Object.keys(filter)); // Debug: show all available fields
 
@@ -2190,7 +1769,7 @@
   }
 
   // Function to select an additional filter
-  function selectAdditionalFilter(filterImage) {
+  function selectAdditionalFilter(filterImage: any) {
     console.log("selectAdditionalFilter called with:", filterImage);
     selectedAdditionalFilter = filterImage;
     showAdditionalFiltersModal = false;
@@ -2223,7 +1802,7 @@
     // Clear the overlay canvas
     if (overlayCanvasRef) {
       const ctx = overlayCanvasRef.getContext("2d");
-      ctx.clearRect(0, 0, overlayCanvasRef.width, overlayCanvasRef.height);
+      ctx?.clearRect(0, 0, overlayCanvasRef.width, overlayCanvasRef.height);
     }
   }
 
@@ -2243,7 +1822,7 @@
   });
 
   // Helper function to get filter image URL
-  function getFilterImageUrl(filter) {
+  function getFilterImageUrl(filter: any) {
     const possibleFields = [
       "file_url",
       "filename",
@@ -2268,7 +1847,7 @@
   }
 
   // Helper function to get filter name
-  function getFilterName(filter) {
+  function getFilterName(filter: any) {
     return (
       filter.name ||
       filter.filter_name ||
@@ -2279,7 +1858,7 @@
   }
 
   // Handle image loading errors
-  function handleImageError(event, filter) {
+  function handleImageError(event: any, filter: any) {
     console.log("Image failed to load for filter:", filter);
     event.target.style.display = "none";
     const nextElement = event.target.nextElementSibling;
@@ -2419,7 +1998,14 @@
           autoplay
           playsinline
           class="video-stream {currentCamera === 'user' ? 'mirrored' : ''}"
-        ></video>
+        >
+          <track
+            kind="captions"
+            src=""
+            label="No captions available"
+            default
+          /></video
+        >
         {#if filterUrl}
           <img src={filterUrl} class="ar-filter-overlay" alt="AR Filter" />
         {/if}
@@ -2527,7 +2113,19 @@
 
 <!-- Filters Modal -->
 {#if showFiltersModal}
-  <div class="filters-modal-overlay" on:click={closeFiltersModal}>
+  <div
+    class="filters-modal-overlay"
+    on:click={closeFiltersModal}
+    on:keydown={(e) => {
+      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        closeFiltersModal();
+      }
+    }}
+    role="button"
+    tabindex="0"
+    aria-label="Close filters modal"
+  >
     <div class="filters-modal" on:click|stopPropagation>
       <div class="modal-header">
         <h3>My Filters</h3>
@@ -3877,3 +3475,8 @@
     }
   }
 </style>
+
+
+
+
+

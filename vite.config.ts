@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "icons/*"],
       manifest: {
-        name: "Grantha Katha",
-        short_name: "Grantha Katha",
+        name: "MyAR.in",
+        short_name: "MyAR.in",
         description:
           "Assamese audiobooks and eBooks on Grantha Katha – your destination for Assamese literature, articles, and newsletters. Immerse yourself in Assam’s literary heritage!",
         theme_color: "#6257a5",

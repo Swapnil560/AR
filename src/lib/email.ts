@@ -10,7 +10,7 @@ export async function sendEmail(props: SendEmailProps) {
 	const { sendTo, subject, htmlPart } = props;
 	const body = {
 		from: {
-			name: "rong.digital",
+			name: "MyAR.in",
 			email: "noreply@arodos.com",
 		},
 		to: sendTo,

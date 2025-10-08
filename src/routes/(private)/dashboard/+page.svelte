@@ -25,6 +25,14 @@
   import Logo from "../../../components/logo.svelte";
   import { getHost } from "$lib/utils";
 
+  import {
+    uploadImage,
+    compressImage,
+    validateTransparency,
+  } from "$lib/imageUpload";
+
+  import BillingPlans from "../../../components/BillingPlans.svelte";
+
   let user = $state(null);
   let filters = $state([]);
   let loading = $state(true);
@@ -44,6 +52,13 @@
 
   // Pricing plans state
 
+  let file: File | null = null;
+  let errorMsg: string | null = null;
+  let transparencyInfo: {
+    isValid: boolean;
+    transparencyPercentage: number;
+    error?: string;
+  } | null = null;
   let showPricingPlans = $state(false);
   let currentPlan = $state(); // This would typically come from user data
   let isProcessingPayment = $state(false);
@@ -440,18 +455,74 @@
   // 		error = "Failed to update filter";
   // 	}
   // }
+  async function handleUpload(event) {
+    file = event.target.files[0];
+    if (!file) return;
 
+    // Check file type - allow PNG and GIF
+    if (
+      !file.type.startsWith("image/png") &&
+      !file.type.startsWith("image/gif")
+    ) {
+      errorMsg = "Only PNG and GIF images are allowed!";
+      return;
+    }
+
+    // Updated file size limit to 30MB
+    if (file.size > 30 * 1024 * 1024) {
+      errorMsg = "File too large (max 30MB)";
+      return;
+    }
+
+    // Validate transparency
+    try {
+      transparencyInfo = await validateTransparency(file);
+      console.log("transparencyInfo", transparencyInfo);
+
+      if (!transparencyInfo.isValid) {
+        errorMsg =
+          transparencyInfo.error ||
+          "Image does not meet transparency requirements";
+        return;
+      }
+    } catch (error) {
+      console.error("Transparency validation error:", error);
+      errorMsg = "Failed to validate image transparency. Please try again.";
+      return;
+    }
+  }
   async function saveEdit(filterId) {
     try {
       console.log("Saving edit with data:", editForm);
-
-      const response = await updateFilter({
+      let updatedData = {
         id: filterId,
         name: editForm.name,
         pretext: editForm.pretext, // Make sure this is included
         description: editForm.description,
         ai_need: editForm.ai_need,
-      });
+      };
+      if (file) {
+        // Apply transparency validation before uploading
+        if (!transparencyInfo?.isValid) {
+          console.log("errorMsg", errorMsg);
+          errorMsg =
+            "Image transparency validation failed. Please upload a valid transparent image.";
+          return;
+        }
+
+        let imageToUpload = file;
+        if (file.type.startsWith("image/png")) {
+          imageToUpload = await compressImage(file);
+        }
+
+        // Upload to server
+        const uploadedImageUrl = await uploadImage(imageToUpload, "filters");
+
+        // Construct full image URL
+        const fullImageUrl = `${import.meta.env.VITE_IMAGE_URL}/${uploadedImageUrl}`;
+        updatedData["filter_url"] = fullImageUrl;
+      }
+      const response = await updateFilter(updatedData);
 
       console.log("Update response:", response);
 
@@ -474,6 +545,8 @@
         error =
           "Failed to update filter: " + (response.error || "Unknown error");
       }
+      closeModal();
+      await loadUserFilters();
     } catch (err) {
       console.error("Error updating filter:", err);
       error = "Failed to update filter: " + err.message;
@@ -532,7 +605,7 @@
 
   <main class="main-content">
     <div class="dashboard-header">
-      <h2 class="dashboard-title">My Filters</h2>
+      <h2 class="dashboard-title">My AR Filters</h2>
       <div class="header-actions-group">
         <div class="action-buttons-group">
           <button class="action-btn plans-btn" on:click={togglePricingPlans}>
@@ -553,100 +626,17 @@
 
     <!-- Pricing Plans Section -->
     {#if showPricingPlans}
-      <div class="pricing-section">
-        <div class="pricing-header">
-          <h3 class="pricing-title">Choose Your Plan</h3>
-          <button class="close-btn" on:click={togglePricingPlans}>✕</button>
-        </div>
-        <div>
-          <div class="billing-switch">
-            <span class="switch-label">Billing:</span>
-            <label
-              class="switch-option {displayRate === 'monthly' ? 'active' : ''}"
-            >
-              <input type="radio" bind:group={displayRate} value="monthly" />
-              Monthly
-            </label>
-            <label
-              class="switch-option {displayRate === 'yearly' ? 'active' : ''}"
-            >
-              <input type="radio" bind:group={displayRate} value="yearly" />
-              Yearly
-            </label>
-          </div>
-        </div>
-        <div class="pricing-grid">
-          {#each pricingPlans as plan}
-            <div
-              class="pricing-card {plan.popular
-                ? 'popular'
-                : ''} {currentPlan == plan.id ? 'current' : ''}"
-            >
-              {#if plan.popular}
-                <div class="popular-badge">Most Popular</div>
-              {/if}
-              {#if currentPlan === plan.id}
-                <div class="current-badge">Current Plan</div>
-              {/if}
-
-              <div class="plan-header">
-                <h4 class="plan-name">{plan.name}</h4>
-                <div class="plan-price">
-                  <span class="price"
-                    >₹{displayRate === "monthly"
-                      ? plan.monthly_price
-                      : plan.yearly_price}</span
-                  >
-                  {#if plan.period !== "forever"}
-                    <span class="period"
-                      >/{displayRate === "monthly" ? "mo" : "yr"}</span
-                    >
-                  {/if}
-                </div>
-              </div>
-
-              <div class="plan-features">
-                <div class="feature-item">
-                  <span class="feature-label">Filters:</span>
-                  <span class="feature-value">{plan.filters}</span>
-                </div>
-                <div class="feature-item">
-                  <span class="feature-label">Storage:</span>
-                  <span class="feature-value">{plan.storage}</span>
-                </div>
-                <div class="feature-item">
-                  <span class="feature-label">Features:</span>
-                  <span class="feature-value">{plan.features}</span>
-                </div>
-              </div>
-
-              <div class="plan-action">
-                {#if currentPlan === plan.id}
-                  <button class="plan-btn current" disabled>Current Plan</button
-                  >
-                {:else}
-                  <button
-                    class="plan-btn"
-                    on:click={() => selectPlan(plan.id)}
-                    disabled={isProcessingPayment || currentPlan == plan.id}
-                  >
-                    {#if isProcessingPayment}
-                      <div class="payment-loading">
-                        <div class="spinner"></div>
-                        Processing...
-                      </div>
-                    {:else if currentPlan == plan.id}
-                      Subscribed
-                    {:else}
-                      {plan.monthly_price == 0 ? "Downgrade" : "Upgrade"} to {plan.name}
-                    {/if}
-                  </button>
-                {/if}
-              </div>
-            </div>
-          {/each}
-        </div>
-      </div>
+      <BillingPlans
+        {pricingPlans}
+        {currentPlan}
+        {displayRate}
+        show={showPricingPlans}
+        {isProcessingPayment}
+        {loading}
+        onSelectPlan={selectPlan}
+        onToggle={togglePricingPlans}
+        showBillingSwitch={true}
+      />
     {:else}
       <!-- Filters Content -->
       {#if loading}
@@ -760,6 +750,23 @@
               ></textarea>
             </div>
 
+            <div>
+              <label class="input-label">Edit Filter</label>
+              <input
+                type="file"
+                accept="image/png,image/gif"
+                on:change={handleUpload}
+                class="file-input"
+                id="file-upload"
+              />
+            </div>
+
+            <div class="upload-requirements">
+              <p>• Only PNG and GIF images allowed</p>
+              <p>• Maximum file size: 30MB</p>
+              <p>• Must have transparent background (min 10%)</p>
+            </div>
+
             <div class="form-group">
               <label class="checkbox-label">
                 <input
@@ -770,7 +777,6 @@
                 AI Enhanced
               </label>
             </div>
-
             <div class="edit-actions">
               <button
                 class="save-btn"
@@ -947,7 +953,7 @@
   .welcome-text {
     color: #4a5568;
     font-weight: 500;
-    margin-right: 3rem;
+    /* margin-right: 3rem; */
   }
 
   .logout-btn {
