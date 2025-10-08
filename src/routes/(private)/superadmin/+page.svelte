@@ -19,11 +19,31 @@
     updatePricePlan,
     deletePricePlan,
   } from "../../../services/actions/price-plans.js";
-  import { Eye, IndianRupee, LogOut, Palette, Pencil, Plus, Trash2, User, Users } from "lucide-svelte";
-  import { Pen } from "@lucide/svelte";
+  import {
+    Eye,
+    IndianRupee,
+    LogOut,
+    Palette,
+    Pencil,
+    Plus,
+    Trash2,
+    User,
+    Users,
+    LayoutDashboard,
+    User2,
+  } from "lucide-svelte";
+  import { CreditCard, Proportions } from "@lucide/svelte";
+  import Logo from "../../../components/logo.svelte";
+  import mobile from "../../../components/SVG.png";
+  import photo from "../../../components/SVG (2).png";
+  import camera from "../../../components/SVG (1).png";
+  import cross from "../../../components/SVG (3).png";
+  import filter from "../../../components/Vintage filter preview.png";
+  import piechart from "../../../components/Container.png";
+  import graph from "../../../components/SVG (4).png";
 
   let user = null;
-  let activeTab = "users";
+  let activeSection = "dashboard"; // Changed from activeTab
   let loading = false;
   let loadingUsers = false;
   let loadingFilters = false;
@@ -83,6 +103,14 @@
     features: "",
   };
 
+  // Dashboard Statistics
+  let dashboardStats = {
+    totalUsers: 0,
+    totalFilters: 0,
+    regularUsers: 0,
+    superAdmins: 0,
+  };
+
   onMount(() => {
     // Check for auth parameter in URL (from subdomain redirect)
     const urlParams = new URLSearchParams(window.location.search);
@@ -126,27 +154,41 @@
   });
 
   // Reactive statements for pagination
-  $: if (activeTab === "users" && user) {
+  $: if (activeSection === "users" && user) {
     loadUsers();
   }
 
-  $: if (activeTab === "filters" && user && users.length > 0) {
+  $: if (activeSection === "filters" && user && users.length > 0) {
     loadFilters();
   }
 
-  $: if (activeTab === "plans" && user) {
+  $: if (activeSection === "plans" && user) {
     loadPlans();
   }
 
   // Reload filters when includeDeletedFilters toggle changes
   $: if (
     includeDeletedFilters !== undefined &&
-    activeTab === "filters" &&
+    activeSection === "filters" &&
     user &&
     users.length > 0
   ) {
     currentFiltersPage = 1; // Reset to first page
     loadFilters();
+  }
+
+  // Update dashboard stats when data changes
+  $: if (users.length > 0) {
+    updateDashboardStats();
+  }
+
+  function updateDashboardStats() {
+    dashboardStats = {
+      totalUsers: totalUsers,
+      totalFilters: totalFilters,
+      regularUsers: users.filter((u) => u.role === "user").length,
+      superAdmins: users.filter((u) => u.role === "super_admin").length,
+    };
   }
 
   async function loadData() {
@@ -155,6 +197,7 @@
       // Load users first, then filters (so we can match user names)
       await loadUsers();
       await loadFilters();
+      await loadPlans();
     } catch (err) {
       error = "Failed to load data";
     }
@@ -175,6 +218,7 @@
       users = response.result || [];
       totalUsers = response.count || 0;
       totalUsersPages = Math.ceil(totalUsers / usersPerPage);
+      updateDashboardStats();
     } catch (err) {
       error = "Failed to load users";
       console.error("Error loading users:", err);
@@ -218,6 +262,7 @@
 
       totalFilters = response.count || 0;
       totalFiltersPages = Math.ceil(totalFilters / filtersPerPage);
+      updateDashboardStats();
     } catch (err) {
       error = "Failed to load filters";
       console.error("Error loading filters:", err);
@@ -374,7 +419,7 @@
   }
 
   async function refreshFiltersAfterUserChange() {
-    if (activeTab === "filters") {
+    if (activeSection === "filters") {
       await loadFilters();
     }
   }
@@ -523,20 +568,20 @@
     success = "";
   }
 
-  // Reset pagination when switching tabs
-  async function switchTab(newTab) {
-    if (activeTab === newTab) return; // Don't switch if already on the same tab
+  // Reset pagination when switching sections
+  async function switchSection(newSection) {
+    if (activeSection === newSection) return; // Don't switch if already on the same section
 
-    activeTab = newTab;
-    if (newTab === "users") {
+    activeSection = newSection;
+    if (newSection === "users") {
       currentUsersPage = 1;
       await loadUsers();
-    } else if (newTab === "filters") {
+    } else if (newSection === "filters") {
       currentFiltersPage = 1;
       if (users.length > 0) {
         await loadFilters();
       }
-    } else if (newTab === "plans") {
+    } else if (newSection === "plans") {
       currentPlansPage = 1;
       await loadPlans();
     }
@@ -630,124 +675,212 @@
   <header class="header">
     <div class="header-content">
       <h1 class="logo">
-        <div class="logo-gradient">myAR.in</div>
-        Super Admin Dashboard
+        <div></div>
+        Welcome Admin
       </h1>
-      <div class="header-actions">
+      <!-- <div class="header-actions">
         <span class="welcome-text">Welcome, {user?.name || "Super Admin"}</span>
-        <button class="logout-btn" on:click={logout}>
-          <span class="logout-icon"><LogOut size=18/></span>
-          Logout
-        </button>
-      </div>
+        
+      </div> -->
+      <button class="action-btn primary">
+        <span class="btn-icon"><Plus /></span>
+        Create Filter
+      </button>
     </div>
   </header>
+  <aside class="sidebar">
+    <nav class="sidebar-nav">
+      <h1 class="logo">
+        <span class="logo-icon"><Logo /></span> MyAR
+      </h1>
+      <button
+        class="nav-item {activeSection === 'dashboard' ? 'active' : ''}"
+        on:click={() => switchSection("dashboard")}
+      >
+        <LayoutDashboard size="20" />
+        <span>Dashboard</span>
+      </button>
+      <!-- <button
+          class="nav-item {activeSection === 'users' ? 'active' : ''}"
+          on:click={() => switchSection('users')}
+        >
+          <Users size=20 />
+          <span>User Management</span>
+        </button> -->
+      <button
+        class="nav-item {activeSection === 'filters' ? 'active' : ''}"
+        on:click={() => switchSection("filters")}
+      >
+        <Palette size="20" />
+        <span>Filter</span>
+      </button>
+      <button
+        class="nav-item {activeSection === 'reports' ? 'active' : ''}"
+        on:click={() => switchSection("reports")}
+      >
+        <Proportions size="20" />
+        <span>Reports</span>
+      </button>
+      <button
+        class="nav-item {activeSection === 'profile' ? 'active' : ''}"
+        on:click={() => switchSection("profile")}
+      >
+        <User2 size="20" />
+        <span>Profile</span>
+      </button>
 
-  <main class="main-content">
-    <!-- Statistics Overview -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">👥</div>
-        <div class="stat-info">
-          <div class="stat-number">{totalUsers}</div>
-          <div class="stat-label">Total Users</div>
+      <button
+        class="nav-item {activeSection === 'plans' ? 'active' : ''}"
+        on:click={() => switchSection("plans")}
+      >
+        <CreditCard size="20" />
+        <span>Plans</span>
+      </button>
+
+      <button class="nav-item on:click={logout}">
+        <LogOut size="20" />
+        <span>Logout</span>
+      </button>
+    </nav>
+  </aside>
+
+  <div class="main-layout">
+    <!-- Sidebar Navigation -->
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Messages -->
+      {#if error}
+        <div class="alert alert-error">
+          <span class="alert-icon">⚠️</span>
+          {error}
+          <button class="alert-close" on:click={clearMessages}>×</button>
         </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">🎨</div>
-        <div class="stat-info">
-          <div class="stat-number">{totalFilters}</div>
-          <div class="stat-label">Total Filters</div>
+      {/if}
+
+      {#if success}
+        <div class="alert alert-success">
+          <span class="alert-icon">✅</span>
+          {success}
+          <button class="alert-close" on:click={clearMessages}>×</button>
         </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">�</div>
-        <div class="stat-info">
-          <div class="stat-number">
-            {users.filter((u) => u.role === "user").length}
+      {/if}
+
+      <!-- Dashboard Section -->
+      {#if activeSection === "dashboard"}
+        <div class="dashboard">
+          <!-- Top Stats -->
+          <div class="stats-grid">
+            <div class="stat-card blue">
+              <div>
+                <h3>App Opens</h3>
+              </div>
+              <div class="icon">
+                <img src={mobile} alt="" />
+                <p class="text">1,234</p>
+              </div>
+            </div>
+
+            <div class="stat-card green">
+              <div>
+                <h3>Camera Access</h3>
+              </div>
+              <div class="icon">
+                <img src={camera} alt="" />
+                <p class="text">876</p>
+              </div>
+            </div>
+
+            <div class="stat-card purple">
+              <div>
+                <h3>Media Captured</h3>
+              </div>
+              <div class="icon">
+                <img src={photo} alt="" />
+                <p class="text">543</p>
+              </div>
+            </div>
+
+            <div class="stat-card red">
+              <div>
+                <h3>App Dropouts</h3>
+              </div>
+              <div class="icon">
+                <img src={cross} alt="" />
+
+                <p class="text">211</p>
+              </div>
+            </div>
           </div>
-          <div class="stat-label">Regular Users</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">�</div>
-        <div class="stat-info">
-          <div class="stat-number">
-            {users.filter((u) => u.role === "super_admin").length}
+
+          <!-- Charts Section -->
+          <div class="charts-grid">
+            <div class="chart-card">
+              <h4>Sharing Platforms</h4>
+              <img src={piechart} alt="" class="pie" />
+
+              <canvas id="sharingChart"> </canvas>
+            </div>
+            <div class="chart-card">
+              <h4>User Locations</h4>
+              <img src={graph} alt="" class="graph" />
+
+              <canvas id="locationChart"></canvas>
+            </div>
           </div>
-          <div class="stat-label">Super Admins</div>
+
+          <!-- Filter Usage Table -->
+          <div class="table-card">
+            <h4>Filter Usage Data</h4>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Org Details</th>
+                  <th>Filter Creation</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <img src={filter} class="filter-img" alt="Shriram" />
+                    Shriram
+                  </td>
+                  <td>Org A</td>
+                  <td>12 Jan 2025</td>
+                </tr>
+                <tr>
+                  <td>
+                    <img src={filter} class="filter-img" alt="AsoB" />
+                    AsoB
+                  </td>
+                  <td>Org B</td>
+                  <td>15 Feb 2025</td>
+                </tr>
+                <tr>
+                  <td>
+                    <img src={filter} class="filter-img" alt="Sepia" />
+                    Sepia
+                  </td>
+                  <td>Org C</td>
+                  <td>28 Mar 2025</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </div>
+      {/if}
 
-    <!-- Messages -->
-    {#if error}
-      <div class="alert alert-error">
-        <span class="alert-icon">⚠️</span>
-        {error}
-        <button class="alert-close" on:click={clearMessages}>×</button>
-      </div>
-    {/if}
-
-    {#if success}
-      <div class="alert alert-success">
-        <span class="alert-icon">✅</span>
-        {success}
-        <button class="alert-close" on:click={clearMessages}>×</button>
-      </div>
-    {/if}
-
-    <!-- Tab Navigation -->
-    <div class="tab-container">
-      <div class="tab-nav">
-        <button
-          class="tab-btn"
-          class:active={activeTab === "users"}
-          class:loading={loadingUsers && activeTab === "users"}
-          disabled={loadingUsers || loadingFilters}
-          on:click={() => switchTab("users")}
-        >
-          {#if loadingUsers && activeTab === "users"}
-            <div class="small-spinner"></div>
-          {/if}
-          <Users/> User Management
-        </button>
-        <button
-          class="tab-btn"
-          class:active={activeTab === "filters"}
-          class:loading={loadingFilters && activeTab === "filters"}
-          disabled={loadingUsers || loadingFilters || loadingPlans}
-          on:click={() => switchTab("filters")}
-        >
-          {#if loadingFilters && activeTab === "filters"}
-            <div class="small-spinner"></div>
-          {/if}
-          <Palette /> Filter Management
-        </button>
-        <button
-          class="tab-btn"
-          class:active={activeTab === "plans"}
-          class:loading={loadingPlans && activeTab === "plans"}
-          disabled={loadingUsers || loadingFilters || loadingPlans}
-          on:click={() => switchTab("plans")}
-        >
-          {#if loadingPlans && activeTab === "plans"}
-            <div class="small-spinner"></div>
-          {/if}
-          <IndianRupee/> Price Plans
-        </button>
-      </div>
-
-      <!-- Users Tab -->
-      {#if activeTab === "users"}
-        <div class="tab-content">
+      <!-- Users Section -->
+      {#if activeSection === "users"}
+        <div class="section-content">
           <div class="section-header">
             <h2 class="section-title">User Management</h2>
             <button
               class="action-btn primary"
               on:click={() => (showCreateAdminModal = true)}
             >
-              <span class="btn-icon"><Plus/></span>
+              <span class="btn-icon"><Plus /></span>
               Create User Account
             </button>
           </div>
@@ -796,14 +929,14 @@
                               showUserModal = true;
                             }}
                           >
-                            <Pencil size=18/>
+                            <Pencil size="18" />
                           </button>
                           {#if user.role !== "super_admin"}
                             <button
                               class="action-btn small danger"
                               on:click={() => handleDeleteUser(user.id)}
                             >
-                             <Trash2 size=18/>
+                              <Trash2 size="18" />
                             </button>
                           {/if}
                         </div>
@@ -865,9 +998,9 @@
         </div>
       {/if}
 
-      <!-- Filters Tab -->
-      {#if activeTab === "filters"}
-        <div class="tab-content">
+      <!-- Filters Section -->
+      {#if activeSection === "filters"}
+        <!-- <div class="section-content">
           <div class="section-header">
             <h2 class="section-title">Filter Management</h2>
             <div class="filter-controls">
@@ -935,13 +1068,13 @@
                               showFilterModal = true;
                             }}
                           >
-                            <Eye size=18/>
+                            <Eye size="18" />
                           </button>
                           <button
                             class="action-btn small danger"
                             on:click={() => handleDeleteFilter(filter.id)}
                           >
-                            <Trash2 size=18/>
+                            <Trash2 size="18" />
                           </button>
                         </div>
                       </td>
@@ -952,7 +1085,6 @@
             {/if}
           </div>
 
-          <!-- Pagination Controls -->
           {#if totalFiltersPages > 1}
             <div class="pagination">
               <div class="pagination-info">
@@ -1001,19 +1133,96 @@
               </div>
             </div>
           {/if}
+        </div> -->
+
+        <div class="filters-page">
+          <h2>Filters for Shriram</h2>
+
+          <div class="filters-grid">
+            <!-- Filter Card -->
+            <div class="filter-card">
+              <img src={filter} alt="Vintage" />
+              <div class="filter-info">
+                <h3>Vintage</h3>
+                <p class="date">Created 1/15/2024</p>
+                <div class="stats">
+                  <span>👁 1,250</span>
+                  <span>⬇ 850</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="filter-card">
+              <img src={filter} alt="Vintage" />
+              <div class="filter-info">
+                <h3>Black & White</h3>
+                <p class="date">Created 2/10/2024</p>
+                <div class="stats">
+                  <span>👁 980</span>
+                  <span>⬇ 720</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="filter-card">
+              <img src={filter} alt="Vintage" />
+              <div class="filter-info">
+                <h3>Sepia</h3>
+                <p class="date">Created 3/5/2024</p>
+                <div class="stats">
+                  <span>👁 650</span>
+                  <span>⬇ 480</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="filter-card">
+              <img src={filter} alt="Vintage" />
+              <div class="filter-info">
+                <h3>Sepia</h3>
+                <p class="date">Created 3/5/2024</p>
+                <div class="stats">
+                  <span>👁 650</span>
+                  <span>⬇ 480</span>
+                </div>
+              </div>
+            </div>
+            <div class="filter-card">
+              <img src={filter} alt="Vintage" />
+              <div class="filter-info">
+                <h3>Sepia</h3>
+                <p class="date">Created 3/5/2024</p>
+                <div class="stats">
+                  <span>👁 650</span>
+                  <span>⬇ 480</span>
+                </div>
+              </div>
+            </div>
+            <div class="filter-card">
+              <img src={filter} alt="Vintage" />
+              <div class="filter-info">
+                <h3>Sepia</h3>
+                <p class="date">Created 3/5/2024</p>
+                <div class="stats">
+                  <span>👁 650</span>
+                  <span>⬇ 480</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       {/if}
 
-      <!-- Price Plans Tab -->
-      {#if activeTab === "plans"}
-        <div class="tab-content">
+      <!-- Price Plans Section -->
+      {#if activeSection === "plans"}
+        <div class="section-content">
           <div class="section-header">
             <h2 class="section-title">Price Plan Management</h2>
             <button
               class="action-btn primary"
               on:click={() => (showCreatePlanModal = true)}
             >
-              <span class="btn-icon"><Plus/></span>
+              <span class="btn-icon"><Plus /></span>
               Create Price Plan
             </button>
           </div>
@@ -1035,7 +1244,7 @@
                 class="action-btn primary"
                 on:click={() => (showCreatePlanModal = true)}
               >
-                <span class="btn-icon"><Plus/></span>
+                <span class="btn-icon"><Plus /></span>
                 Create First Price Plan
               </button>
             </div>
@@ -1094,15 +1303,13 @@
                             class="action-btn small secondary"
                             on:click={() => openPlanModal(plan)}
                           >
-                            <span class="btn-icon"><Eye size=18/></span>
-                            
+                            <span class="btn-icon"><Eye size="18" /></span>
                           </button>
                           <button
                             class="action-btn small danger"
                             on:click={() => handleDeletePlan(plan.id)}
                           >
-                            <span class="btn-icon"><Trash2 size=18/></span>
-                            
+                            <span class="btn-icon"><Trash2 size="18" /></span>
                           </button>
                         </div>
                       </td>
@@ -1226,8 +1433,8 @@
           {/if}
         </div>
       {/if}
-    </div>
-  </main>
+    </main>
+  </div>
 </div>
 
 <!-- Create User Modal -->
@@ -1349,7 +1556,7 @@
                 on:click={() =>
                   handleRoleChange(selectedUser.id, "super_admin")}
               >
-                � Super Admin
+                👑 Super Admin
               </button>
             </div>
           </div>
@@ -1416,7 +1623,7 @@
             class="action-btn danger"
             on:click={() => handleDeleteFilter(selectedFilter.id)}
           >
-            <Trash2 size=18/> Delete Filter
+            <Trash2 size="18" /> Delete Filter
           </button>
         </div>
       </div>
@@ -1703,14 +1910,14 @@
 
           <div class="modal-actions">
             <button class="action-btn primary" on:click={startEditPlan}>
-              <span class="btn-icon"><Pencil size=18/></span>
+              <span class="btn-icon"><Pencil size="18" /></span>
               Edit Plan
             </button>
             <button
               class="action-btn danger"
               on:click={() => handleDeletePlan(selectedPlan.id)}
             >
-              <span class="btn-icon"><Trash2 size=18/></span>
+              <span class="btn-icon"><Trash2 size="18" /></span>
               Delete Plan
             </button>
           </div>
@@ -1740,37 +1947,40 @@
     display: flex;
     flex-direction: column;
   }
-
   .header {
     background: white;
+    position: fixed;
+    z-index: 100;
+    width: calc(100vw - 250px); /* Full viewport width */
+
+    height: 7.5vh;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     border-bottom: 1px solid #e2e8f0;
     padding: 1rem 0;
+    top: 0;
+    left: 250px; /* Move header to start after sidebar */
   }
 
   .header-content {
-    max-width: 1400px;
+    max-width: 100vw;
     margin: 0 auto;
     padding: 0 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
+    height: 100%;
+    padding-right: 44px;
   }
 
   .logo {
     color: #2d3748;
-    font-size: 2rem;
-    font-weight: 700;
-    margin: 0;
+    font-size: 1rem;
+    font-weight: 500;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-  }
-
-  .logo-icon {
-    font-size: 2.5rem;
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+    padding-left: 1rem;
   }
 
   .header-actions {
@@ -1785,8 +1995,7 @@
     margin-right: 1rem;
   }
 
-  .logout-btn {
-    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+  /* .logout-btn {
     color: white;
     border: none;
     border-radius: 12px;
@@ -1798,66 +2007,136 @@
     gap: 0.5rem;
     transition: all 0.3s ease;
     box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
-  }
+  } */
 
-  .logout-btn:hover {
+  /* .logout-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+  } */
+
+  /* Main Layout with Sidebar */
+  /* Main Layout with Sidebar */
+  .main-layout {
+    display: flex;
+    flex: 1;
+    max-width: 100vw;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 8vh; /* Add margin to account for fixed header */
+  }
+
+  .sidebar {
+    height: 100vh; /* Subtract header height */
+    z-index: 100;
+    position: fixed;
+    width: 250px;
+    background: white;
+    border-right: 1px solid #e2e8f0;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+    padding: 0.5rem 0;
+    overflow-y: auto; /* Add scroll if content overflows */
   }
 
   .main-content {
     flex: 1;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2rem 1rem;
-    width: 100%;
+    padding: 2rem;
+    overflow-y: auto;
+    margin-left: 250px; /* Push content to the right of sidebar */
+    width: calc(100vw - 250px); /* Calculate width minus sidebar */
+    min-height: calc(100vh - 8vh); /* Full height minus header */
     box-sizing: border-box;
   }
 
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .main-layout {
+      flex-direction: column;
+      margin-top: 8vh;
+    }
+
+    .sidebar {
+      position: static; /* Remove fixed positioning on mobile */
+      width: 100%;
+      height: auto;
+      margin-top: 0;
+      border-right: none;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 1rem 0;
+    }
+
+    .main-content {
+      margin-left: 0;
+      width: 100%;
+      padding: 1rem;
+      min-height: auto;
+    }
+
+    .sidebar-nav {
+      flex-direction: row;
+      overflow-x: auto;
+      padding: 0 1rem;
+    }
+
+    .nav-item {
+      flex-shrink: 0;
+      border-left: none;
+      border-bottom: 4px solid transparent;
+      padding: 0.75rem 1rem;
+    }
+
+    .nav-item.active {
+      border-left: none;
+      border-bottom-color: #4c51bf;
+    }
   }
 
-  .stat-card {
-    background: white;
-    border-radius: 16px;
-    padding: 1.5rem;
+  @media (max-width: 480px) {
+    .main-content {
+      padding: 0.5rem;
+    }
+
+    .section-content {
+      padding: 1rem;
+    }
+  }
+  .sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .nav-item {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
-  }
-
-  .stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  }
-
-  .stat-icon {
-    font-size: 2.5rem;
-    opacity: 0.8;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .stat-number {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #2d3748;
-    margin: 0;
-  }
-
-  .stat-label {
-    color: #718096;
-    font-size: 0.9rem;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    background: none;
+    border: none;
+    color: #4a5568;
     font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+    border-left: 4px solid transparent;
+  }
+
+  .nav-item:hover {
+    background: #f7fafc;
+    color: #2d3748;
+  }
+
+  .nav-item.active {
+    background: #dbdbdb;
+    color: black;
+    /* border-left-color: #4c51bf; */
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  }
+
+  .main-content {
+    flex: 1;
+    padding: 2rem;
+    overflow-y: auto;
   }
 
   .alert {
@@ -1898,72 +2177,6 @@
     opacity: 1;
   }
 
-  .tab-container {
-    background: white;
-    border-radius: 20px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    overflow: hidden;
-  }
-
-  .tab-nav {
-    display: flex;
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
-  }
-
-  .tab-btn {
-    flex: 1;
-    background: none;
-    border: none;
-    color: #718096;
-    padding: 1.2rem 2rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 1rem;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-  }
-
-  .tab-btn.active {
-    color: #667eea;
-    background: white;
-    border-bottom: 3px solid #667eea;
-  }
-
-  .tab-btn:hover:not(.active) {
-    color: #4a5568;
-    background: #edf2f7;
-  }
-
-  .tab-btn:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
-
-  .tab-btn.loading {
-    position: relative;
-  }
-
-  .small-spinner {
-    width: 16px;
-    height: 16px;
-    border: 2px solid #e2e8f0;
-    border-top: 2px solid #667eea;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    display: inline-block;
-    margin-right: 0.5rem;
-  }
-
-  .tab-content {
-    padding: 2rem;
-  }
-
   .section-header {
     display: flex;
     justify-content: space-between;
@@ -1978,6 +2191,13 @@
     font-size: 1.8rem;
     font-weight: 700;
     margin: 0;
+  }
+
+  .section-subtitle {
+    color: #2d3748;
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 0 0 1.5rem 0;
   }
 
   .filter-controls {
@@ -2236,6 +2456,43 @@
     color: #6b7280;
   }
 
+  /* Quick Actions */
+  .quick-actions {
+    margin-top: 2rem;
+  }
+
+  .actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .action-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  }
+
+  .action-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    border-color: #667eea;
+  }
+
+  .action-card span {
+    font-weight: 600;
+    color: #2d3748;
+  }
+
   /* Modal Styles */
   .modal-overlay {
     position: fixed;
@@ -2451,7 +2708,7 @@
     display: flex;
     justify-content: center;
     margin-top: 1.5rem;
-	gap: 1rem;
+    gap: 1rem;
   }
 
   /* Pagination Styles */
@@ -2568,7 +2825,40 @@
       font-size: 1.5rem;
     }
 
+    .main-layout {
+      flex-direction: column;
+    }
+
+    .sidebar {
+      width: 100%;
+      border-right: none;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 1rem 0;
+    }
+
+    .sidebar-nav {
+      flex-direction: row;
+      overflow-x: auto;
+      padding: 0 1rem;
+    }
+
+    .nav-item {
+      flex-shrink: 0;
+      border-left: none;
+      border-bottom: 4px solid transparent;
+      padding: 0.75rem 1rem;
+    }
+
+    .nav-item.active {
+      border-left: none;
+      border-bottom-color: #4c51bf;
+    }
+
     .main-content {
+      padding: 1rem;
+    }
+
+    .section-content {
       padding: 1rem;
     }
 
@@ -2578,10 +2868,17 @@
     }
 
     .stat-card {
-      padding: 1rem;
+      background: #eaf3ff;
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
       flex-direction: column;
-      text-align: center;
-      gap: 0.5rem;
+    }
+    .stat-content {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start; /* Ensures both elements start from same left */
+      gap: 8px;
     }
 
     .stat-icon {
@@ -2600,24 +2897,6 @@
 
     .section-title {
       font-size: 1.5rem;
-    }
-
-    .tab-nav {
-      flex-direction: column;
-    }
-
-    .tab-btn {
-      padding: 1rem;
-      border-bottom: 1px solid #e2e8f0;
-    }
-
-    .tab-btn.active {
-      border-bottom: 3px solid #667eea;
-      border-right: none;
-    }
-
-    .tab-content {
-      padding: 1rem;
     }
 
     .data-table {
@@ -2686,6 +2965,10 @@
       flex-direction: column;
       text-align: center;
       gap: 1rem;
+    }
+
+    .actions-grid {
+      grid-template-columns: 1fr;
     }
 
     /* Further improvements for action buttons on very small screens */
@@ -2760,11 +3043,6 @@
       border-radius: 0;
     }
 
-    .tab-btn {
-      font-size: 0.9rem;
-      padding: 0.8rem;
-    }
-
     .section-title {
       font-size: 1.3rem;
     }
@@ -2831,5 +3109,241 @@
     max-width: 500px;
     margin-left: auto;
     margin-right: auto;
+  }
+
+  .dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .chart-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+
+  .table-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+
+  .table-card table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+  }
+
+  .table-card th,
+  .table-card td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+  }
+
+  .filter-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+
+  /* Stats Cards Grid */
+  .stats-grid {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  /* Stat Card */
+  .stat-card {
+    border-radius: 12px;
+    padding: 1.2rem;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  /* Title */
+  .stat-card h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  /* Icon + Number Row */
+  .stat-card .icon {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+  }
+
+  .stat-card .icon img {
+    width: 70px;
+    height: 70px;
+    opacity: 0.8;
+  }
+
+  .stat-card .icon .text {
+    font-size: 2rem;
+    font-weight: bold;
+  }
+
+  /* Color Themes */
+  .stat-card.blue {
+    background: #1d7fe0;
+  }
+  .stat-card.green {
+    background: #28a745;
+  }
+  .stat-card.purple {
+    background: #7e3ff2;
+  }
+  .stat-card.red {
+    background: #e6492d;
+  }
+
+  /* Charts Grid */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .chart-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .chart-card h4 {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  /* Table Card */
+  .table-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .table-card h4 {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .table-card table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .table-card th,
+  .table-card td {
+    text-align: left;
+    padding: 0.8rem;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .table-card th {
+    background: #f5f5f5;
+    font-weight: 600;
+  }
+
+  .filter-img {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  .graph {
+    width: 98%;
+  }
+  .pie {
+    width: 80%;
+  }
+
+  .filters-page {
+    margin-top: 20px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    border-radius: 12px;
+    background-color: #fff;
+  }
+
+  .filters-page h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Grid layout */
+  .filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+
+  /* Card */
+  .filter-card {
+    background: #fff;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    border: 1px solid #ccc; /* 👈 add this */
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .filter-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  }
+
+  .filter-card img {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    margin-right: 1rem;
+  }
+
+  /* Info section */
+  .filter-info h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .filter-info .date {
+    font-size: 0.85rem;
+    color: #666;
+    margin: 0.2rem 0 0.5rem 0;
+  }
+
+  .filter-info .stats {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.85rem;
+    color: #444;
   }
 </style>
