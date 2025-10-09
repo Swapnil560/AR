@@ -32,6 +32,7 @@
   } from "$lib/imageUpload";
 
   import BillingPlans from "../../../components/BillingPlans.svelte";
+  import { logEvent } from "$lib/logHelper.js";
 
   let user = $state(null);
   let filters = $state([]);
@@ -391,14 +392,20 @@
       copySuccess = false;
     }, 2000);
   }
-
-  function downloadQR(qrCodeUrl, filterName) {
+  async function downloadQR(qrCodeUrl, filterName) {
     const link = document.createElement("a");
     link.download = `${filterName}-qr-code.png`;
     link.href = qrCodeUrl;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    // Log the download
+    try {
+      await logEvent("downloadQr");
+    } catch (err) {
+      console.error("Failed to log QR download:", err);
+    }
   }
 
   function startEdit(filter) {

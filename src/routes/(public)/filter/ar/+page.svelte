@@ -12,6 +12,7 @@
     Zap,
   } from "@lucide/svelte";
   import { getFiltersByUser } from "../../../../services/actions/filter.js";
+  import { logEvent } from "$lib/logHelper.js";
 
   // Base URL for filter images
   const FILTER_BASE_URL =
@@ -916,6 +917,11 @@
     try {
       isCapturing = true;
 
+      if (!isCameraActive) {
+        logEvent("cameraAccess");
+        isCameraActive = true; // ensure we don't log multiple times
+      }
+
       const ctx = canvasRef.getContext("2d");
       if (!ctx) {
         throw new Error("Canvas context not available");
@@ -1060,6 +1066,8 @@
       console.log(
         `Captured image as ${outputFormat} at ${destWidth}x${destHeight}`
       );
+
+      logEvent("photoCaptured");
 
       // Stop camera and show preview
       stopCamera();
@@ -1395,7 +1403,10 @@
         try {
           console.log("Starting MediaRecorder...");
           mediaRecorder?.start(100); // Smaller timeslices for better mobile compatibility
-          console.log("MediaRecorder started with state:", mediaRecorder?.state);
+          console.log(
+            "MediaRecorder started with state:",
+            mediaRecorder?.state
+          );
         } catch (error) {
           console.error("Failed to start MediaRecorder:", error);
           isRecording = false;
@@ -1479,11 +1490,19 @@
     console.log("capturedImg:", !!capturedImg);
     console.log("recordedVideo:", !!recordedVideo);
 
+    if (capturedImg) {
+      logEvent("photoShare");
+    } else if (recordedVideo) {
+      logEvent("videoShare");
+    }
+
     try {
       const response = await getFiltersByUser({ userId: currentUserId });
       if (response?.result?.length > 0) {
         const userFilters = response.result;
-        const activeFilter = userFilters.find((a) => a.filter_url === filterUrl);
+        const activeFilter = userFilters.find(
+          (a) => a.filter_url === filterUrl
+        );
         if (activeFilter?.pretext) {
           dynamicCaption = `${activeFilter.pretext} \n${activeFilter.description}`;
         }
@@ -3475,8 +3494,3 @@
     }
   }
 </style>
-
-
-
-
-
