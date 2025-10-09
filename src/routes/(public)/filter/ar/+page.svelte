@@ -87,7 +87,9 @@
 
   onMount(async () => {
     // Fire-and-forget filter load so camera doesn't wait on network/image decode
+    await logEvent("cameraAccessAttempt");
     loadFilter();
+
     await startCamera();
 
     // Initialize offscreen canvas for better performance
@@ -909,6 +911,8 @@
   async function capturePhoto() {
     if (isCapturing) return; // Prevent multiple simultaneous captures
 
+    await logEvent("photoCapture");
+
     // Add haptic feedback on supported devices for better UX
     if (navigator.vibrate) {
       navigator.vibrate(50); // Short vibration feedback
@@ -1088,6 +1092,8 @@
       alert("Video recording is not supported on this device/browser.");
       return;
     }
+
+    await logEvent("videoRecordingStart");
 
     try {
       recordedChunks = [];
@@ -1556,6 +1562,11 @@
       if (files.length && navigator.share && navigator.canShare?.({ files })) {
         await navigator.share({ title: "MyAR", text: CAPTION, files });
         console.log("Shared via Web Share API with files");
+        if (capturedImg) {
+          await logEvent("photoShare");
+        } else if (recordedVideo) {
+          await logEvent("videoShare");
+        }
         return;
       }
     } catch (err) {
