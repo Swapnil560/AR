@@ -4,8 +4,9 @@ import { v4 as uuidv4 } from "uuid";
 /**
  * Logs user activity (QRscan, capture, share, etc.)
  * Always sends: user, type, timestamp
+ * Optional: additional data as key-value pairs
  */
-export async function logEvent(type: string) {
+export async function logEvent(type: string, data: Record<string, any> = {}) {
   try {
     let userData = localStorage.getItem("user");
     let userId: string | null = null;
@@ -29,6 +30,7 @@ export async function logEvent(type: string) {
       user: userId,
       type,
       timestamp: new Date().toISOString(),
+      ...data // Spread the additional data
     };
 
     await saveLogs(logData);

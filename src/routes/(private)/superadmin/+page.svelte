@@ -737,7 +737,7 @@
         <span>Plans</span>
       </button>
 
-      <button class="nav-item on:click={logout}">
+      <button class="nav-item" on:click={logout}>
         <LogOut size="20" />
         <span>Logout</span>
       </button>
