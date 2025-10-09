@@ -48,6 +48,9 @@
   let isFlashOn = false; // Track flash state
   let isProcessingVideo = false; // Track video processing state
 
+  let videoRecordingStartTime = 0;
+  let videoDuration = 0;
+
   // Video recording countdown
   let recordingCountdown = 0; // Countdown timer for video recording
   let countdownInterval: number | null = null; // Store interval ID
@@ -1432,6 +1435,17 @@
   function stopVideoRecording() {
     if (mediaRecorder && isRecording) {
       console.log("Stopping video recording...");
+      console.log("Current MediaRecorder state:", mediaRecorder.state);
+      console.log("Recorded chunks so far:", recordedChunks.length);
+
+      videoDuration = Date.now() - videoRecordingStartTime;
+      const durationInSeconds = Math.round(videoDuration / 1000);
+      const durationInMinutes = (durationInSeconds / 60).toFixed(2); // Convert to minutes with 2 decimal places
+
+      // Log video recording stop with duration in seconds and minutes
+    
+      logEvent(`videoRecordInMinute${durationInMinutes}min`);
+
       console.log("Current MediaRecorder state:", mediaRecorder.state);
       console.log("Recorded chunks so far:", recordedChunks.length);
 
