@@ -1071,7 +1071,7 @@
         `Captured image as ${outputFormat} at ${destWidth}x${destHeight}`
       );
 
-      logEvent("photoCaptured");
+      // logEvent("photoCaptured");
 
       // Stop camera and show preview
       stopCamera();
@@ -1496,11 +1496,11 @@
     console.log("capturedImg:", !!capturedImg);
     console.log("recordedVideo:", !!recordedVideo);
 
-    if (capturedImg) {
-      logEvent("photoShare");
-    } else if (recordedVideo) {
-      logEvent("videoShare");
-    }
+    // if (capturedImg) {
+    //   logEvent("photoShare");
+    // } else if (recordedVideo) {
+    //   logEvent("videoShare");
+    // }
 
     try {
       const response = await getFiltersByUser({ userId: currentUserId });
