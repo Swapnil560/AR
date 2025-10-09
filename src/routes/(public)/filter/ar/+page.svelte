@@ -1096,7 +1096,7 @@
       alert("Video recording is not supported on this device/browser.");
       return;
     }
-
+    videoRecordingStartTime = Date.now();
     await logEvent("videoRecordingStart");
 
     try {
@@ -1440,11 +1440,11 @@
 
       videoDuration = Date.now() - videoRecordingStartTime;
       const durationInSeconds = Math.round(videoDuration / 1000);
-      const durationInMinutes = (durationInSeconds / 60).toFixed(2); // Convert to minutes with 2 decimal places
+      const durationInMinutes = (durationInSeconds / 60).toFixed(1); // Convert to minutes with 2 decimal places
 
       // Log video recording stop with duration in seconds and minutes
-    
-      logEvent(`videoRecordInMinute${durationInMinutes}min`);
+
+      logEvent(`videoRecorded${durationInMinutes}min`);
 
       console.log("Current MediaRecorder state:", mediaRecorder.state);
       console.log("Recorded chunks so far:", recordedChunks.length);
