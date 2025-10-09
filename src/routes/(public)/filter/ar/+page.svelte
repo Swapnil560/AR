@@ -86,6 +86,7 @@
   }
 
   onMount(async () => {
+    await logEvent("openLink");
     // Fire-and-forget filter load so camera doesn't wait on network/image decode
     await logEvent("cameraAccessAttempt");
     loadFilter();
