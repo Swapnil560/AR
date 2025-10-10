@@ -88,29 +88,62 @@
     console.log("Additional filters modal should be visible now");
   }
 
-  onMount(async () => {
-    await logEvent("openLink");
-    // Fire-and-forget filter load so camera doesn't wait on network/image decode
-    await logEvent("cameraAccessAttempt");
-    loadFilter();
 
-    await startCamera();
+  // Add this function to load user filters
+async function loadUserFilters() {
+  if (!currentUserId) {
+    console.log("No user ID available to load filters");
+    return;
+  }
 
-    // Initialize offscreen canvas for better performance
-    initializeOffscreenCanvas();
-
-    // Only initialize face tracking in browser
-    if (typeof window !== "undefined") {
-      await initializeFaceTracking();
-      // Start face tracking after initialization with a delay
-      setTimeout(() => {
-        if (faceMesh && isCameraActive) {
-          startFaceTracking();
-          console.log("Face tracking started after initial setup");
-        }
-      }, 1500);
+  try {
+    const response = await getFiltersByUser({ userId: currentUserId });
+    if (response?.result?.length > 0) {
+      userFilters = response.result;
+      console.log("User filters loaded successfully:", userFilters.length);
+      
+      // Set dynamic caption if we have a matching filter
+      const activeFilter = userFilters.find((a) => a.filter_url === filterUrl);
+      console.log("Active filter for caption:", activeFilter);
+      if (activeFilter?.pretext) {
+        dynamicCaption = `${activeFilter.pretext} \n${activeFilter.description}`;
+      }
     }
-  });
+  } catch (e) {
+    console.error("Error fetching user filters:", e);
+  }
+}
+
+onMount(async () => {
+  await logEvent("openLink");
+  await logEvent("cameraAccessAttempt");
+  
+  // Load filter first to get currentUserId
+  await loadFilter();
+
+  // Load user filters if we have a user ID
+  if (currentUserId) {
+    console.log("Loading user filters for user:", currentUserId);
+    await loadUserFilters(); // ← ADD THIS LINE
+  } else {
+    console.log("No user ID found, skipping user filters load");
+  }
+
+  await startCamera();
+  initializeOffscreenCanvas();
+
+  // Only initialize face tracking in browser
+  if (typeof window !== "undefined") {
+    await initializeFaceTracking();
+    // Start face tracking after initialization with a delay
+    setTimeout(() => {
+      if (faceMesh && isCameraActive) {
+        startFaceTracking();
+        console.log("Face tracking started after initial setup");
+      }
+    }, 1500);
+  }
+});
 
   // Initialize offscreen canvas for compositing operations
   function initializeOffscreenCanvas() {
@@ -1093,74 +1126,57 @@
   // Function to log filter usage when photo is captured
 // Enhanced debug version of logFilterCapture
 // Function to log filter usage when photo is captured
+// Enhanced logFilterCapture function with better debugging
 async function logFilterCapture() {
   try {
     console.log("🔄 STARTING FILTER LOGGING DEBUG...");
-    
-    let activeFilterName = "no_filter";
-    
-    // Try to find the filter in userFilters array first
+    console.log("filterUrl:", filterUrl);
+    console.log("currentUserId:", currentUserId);
+    console.log("userFilters available:", userFilters.length);
+    console.log("userFilters content:", userFilters);
+
+    let actualFilterId = null;
+
+    // Find the actual filter ID from userFilters
     if (filterUrl && userFilters.length > 0) {
-      // Find the filter that matches the current filterUrl
-      const currentFilter = userFilters.find(filter => {
-        const filterImageUrl = getFilterImageUrl(filter);
-        return filterImageUrl === filterUrl;
+      console.log("🔍 Looking for filter with URL:", filterUrl);
+      
+      const activeFilter = userFilters.find((a) => {
+        console.log("Comparing:", {
+          filterUrl: filterUrl,
+          userFilterUrl: a.filter_url,
+          match: a.filter_url === filterUrl
+        });
+        return a.filter_url === filterUrl;
       });
       
-      if (currentFilter) {
-        // Use the actual filter name
-        activeFilterName = getFilterName(currentFilter);
-        console.log("📁 Found filter in userFilters:", activeFilterName);
+      console.log("activeFilter found:", activeFilter);
+      
+      if (activeFilter) {
+        actualFilterId = activeFilter.id;
+        console.log("✅ Using filter ID:", actualFilterId);
       } else {
-        // Fallback: extract from URL
-        const urlParts = filterUrl.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        activeFilterName = fileName.replace('.png', '').replace(/\s+/g, '_');
-        console.log("📁 Filter not found in userFilters, using filename:", activeFilterName);
+        console.log("❌ No matching filter found. Available URLs:");
+        userFilters.forEach((filter, index) => {
+          console.log(`  ${index}: ${filter.filter_url}`);
+        });
       }
-    } else if (filterUrl) {
-      // Fallback if no userFilters loaded
-      const urlParts = filterUrl.split('/');
-      const fileName = urlParts[urlParts.length - 1];
-      activeFilterName = fileName.replace('.png', '').replace(/\s+/g, '_');
-      console.log("📁 No userFilters available, using filename:", activeFilterName);
     } else {
-      console.log("🚫 No filter active");
+      console.log("ℹ️ No filterUrl or userFilters available");
+      if (!filterUrl) console.log("  - filterUrl is null/empty");
+      if (userFilters.length === 0) console.log("  - userFilters is empty");
     }
-    
-    // Check additional face tracking filter
-    if (selectedAdditionalFilter) {
-      const additionalFilter = additionalFilters.find(f => f.image === selectedAdditionalFilter);
-      if (additionalFilter) {
-        const additionalFilterName = additionalFilter.name.replace(/\s+/g, '_').toLowerCase();
-        console.log("🎭 Additional filter detected:", additionalFilterName);
-        if (activeFilterName !== "no_filter") {
-          activeFilterName += `_with_${additionalFilterName}`;
-        } else {
-          activeFilterName = additionalFilterName;
-        }
-      }
-    }
-    
-    // Sanitize the filter name
-    const sanitizedFilterName = activeFilterName
-      .replace(/[^a-zA-Z0-9_]/g, "")
-      .toLowerCase()
-      .substring(0, 50);
-    
-    console.log("📸 Final filter name for logging:", sanitizedFilterName);
-    
-    // Log the event
-    const eventName = `usedFilter_${sanitizedFilterName}`;
-    await logEvent(eventName);
-    console.log("✅ Filter event logged successfully:", eventName);
+
+    // Always log "filterUsed" event with the actual filter ID
+    console.log("📤 Logging filter event with ID:", actualFilterId);
+    await logEvent("filterUsed", actualFilterId);
+    console.log("✅ Filter used logged with ID:", actualFilterId);
     
   } catch (error) {
     console.error("❌ Failed to log filter capture:", error);
-    
-    // Fallback logging
+    // Fallback
     try {
-      await logEvent("filter_used_unknown");
+      await logEvent("filterUsed", null);
     } catch (fallbackError) {
       console.error("❌ Fallback filter logging also failed:", fallbackError);
     }
@@ -1595,13 +1611,16 @@ async function shareContent() {
   //   logEvent("videoShare");
   // }
 
-  try {
+ try {
     const response = await getFiltersByUser({ userId: currentUserId });
     if (response?.result?.length > 0) {
-      const userFilters = response.result;
+      // REMOVE 'const' - update the global variable
+      userFilters = response.result; // ← Remove 'const' here
+      console.log("userFilters", userFilters)
       const activeFilter = userFilters.find(
         (a) => a.filter_url === filterUrl
       );
+      console.log("activeFilter", activeFilter)
       if (activeFilter?.pretext) {
         dynamicCaption = `${activeFilter.pretext} \n${activeFilter.description}`;
       }
@@ -2696,7 +2715,7 @@ async function shareContent() {
     right: 0;
     z-index: 20;
     padding: 5px 5px calc(env(safe-area-inset-bottom, 5px) + 5px) 5px;
-    background: black;
+    /* background: black; */
   }
 
   .capture-controls {

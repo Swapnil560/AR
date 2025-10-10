@@ -33,23 +33,38 @@
     User2,
   } from "lucide-svelte";
   import { CreditCard, Proportions } from "@lucide/svelte";
-  import Logo from "../../../components/logo.svelte";
-  import mobile from "../../../components/SVG.png";
-  import photo from "../../../components/SVG (2).png";
-  import camera from "../../../components/SVG (1).png";
-  import cross from "../../../components/SVG (3).png";
-  import filter from "../../../components/Vintage filter preview.png";
-  import piechart from "../../../components/Container.png";
-  import graph from "../../../components/SVG (4).png";
+  import mobile from "../../../lib/assets/SVG.png";
+  import photo from "../../../lib/assets/SVG (2).png";
+  import camera from "../../../lib/assets/SVG (1).png";
+  import cross from "../../../lib/assets/SVG (3).png";
+  import filter from "../../../lib/assets/Vintage filter preview.png";
+  import piechart from "../../../lib/assets/Container.png";
+  import graph from "../../../lib/assets/SVG (4).png";
+  import Header from "../../../components/Header.svelte";
+  import Sidebar from "../../../components/Sidebar.svelte";
+  import Dashboard from "./dashboard.svelte";
+  import ImageUpload from "./ImageUpload.svelte";
+  import Client from "./client.svelte";
+  import FilterGrid from "./filterGrid.svelte";
 
   let user = null;
-  let activeSection = "dashboard"; // Changed from activeTab
+  let activeSection = "dashboard";
   let loading = false;
   let loadingUsers = false;
   let loadingFilters = false;
   let loadingPlans = false;
   let error = "";
   let success = "";
+
+  // Image Upload State
+  let showImageUpload = false;
+  let isUploading = false;
+  let uploadSuccess = false;
+  let transparencyInfo: {
+    isValid: boolean;
+    transparencyPercentage: number;
+    error?: string;
+  } | null = null;
 
   // User Management State
   let users = [];
@@ -111,24 +126,51 @@
     superAdmins: 0,
   };
 
+  // Dynamic title based on active section
+  $: sectionTitle = getSectionTitle(activeSection);
+
+  function getSectionTitle(section: string): string {
+    const titles = {
+      dashboard: "Dashboard",
+      users: "User Management",
+      filters: "Filters",
+      reports: "Reports",
+      profile: "Profile",
+      plans: "Price Plans",
+    };
+    return titles[section] || "Dashboard";
+  }
+
+  // Image Upload Handlers
+  function handleFileSelected(event) {
+    const file = event.detail.file;
+    console.log("File selected:", file);
+    // Add your file processing logic here
+  }
+
+  function handleCreateFilter() {
+    showImageUpload = true;
+  }
+
+  function handleCloseImageUpload() {
+    showImageUpload = false;
+    isUploading = false;
+    uploadSuccess = false;
+    transparencyInfo = null;
+    error = "";
+  }
+
   onMount(() => {
-    // Check for auth parameter in URL (from subdomain redirect)
     const urlParams = new URLSearchParams(window.location.search);
     const authParam = urlParams.get("auth");
 
     if (authParam) {
       try {
-        // Decode user data from URL parameter
         const userData = JSON.parse(atob(authParam));
         console.log("User data from URL:", userData);
-
-        // Store in localStorage for the current domain/subdomain
         localStorage.setItem("user", JSON.stringify(userData));
-
-        // Clean up URL by removing auth parameter
         const newUrl = window.location.pathname;
         window.history.replaceState({}, document.title, newUrl);
-
         user = userData;
       } catch (error) {
         console.error("Error parsing auth parameter:", error);
@@ -136,7 +178,6 @@
         return;
       }
     } else {
-      // Check if user is logged in and is super admin
       const userData = localStorage.getItem("user");
       if (!userData) {
         goto("/login");
@@ -166,18 +207,16 @@
     loadPlans();
   }
 
-  // Reload filters when includeDeletedFilters toggle changes
   $: if (
     includeDeletedFilters !== undefined &&
     activeSection === "filters" &&
     user &&
     users.length > 0
   ) {
-    currentFiltersPage = 1; // Reset to first page
+    currentFiltersPage = 1;
     loadFilters();
   }
 
-  // Update dashboard stats when data changes
   $: if (users.length > 0) {
     updateDashboardStats();
   }
@@ -194,7 +233,6 @@
   async function loadData() {
     loading = true;
     try {
-      // Load users first, then filters (so we can match user names)
       await loadUsers();
       await loadFilters();
       await loadPlans();
@@ -245,16 +283,12 @@
         return;
       }
 
-      // Get filters and match with user names
       const rawFilters = response.result || [];
-
-      // Map user IDs to user names for quick lookup
       const userMap = {};
       users.forEach((user) => {
         userMap[user.id] = user.name;
       });
 
-      // Add user_name to each filter based on user ID
       filters = rawFilters.map((filter) => ({
         ...filter,
         user_name: userMap[filter.user] || "Unknown",
@@ -442,9 +476,8 @@
       showCreateAdminModal = false;
       userForm = { name: "", email: "", phone: "", password: "" };
 
-      // Refresh users with current pagination
       await loadUsers();
-      await refreshFiltersAfterUserChange(); // Refresh filters to update user names
+      await refreshFiltersAfterUserChange();
     } catch (err) {
       error = "Failed to create user account";
     }
@@ -470,16 +503,14 @@
 
       success = "User deleted successfully";
 
-      // Refresh current page data from server
       await loadUsers();
 
-      // If current page becomes empty and it's not the first page, go to previous page
       if (users.length === 0 && currentUsersPage > 1) {
         currentUsersPage--;
         await loadUsers();
       }
 
-      await refreshFiltersAfterUserChange(); // Refresh filters to update user names
+      await refreshFiltersAfterUserChange();
     } catch (err) {
       error = "Failed to delete user";
     }
@@ -508,10 +539,8 @@
 
       success = "Filter deleted successfully";
 
-      // Refresh current page data from server
       await loadFilters();
 
-      // If current page becomes empty and it's not the first page, go to previous page
       if (filters.length === 0 && currentFiltersPage > 1) {
         currentFiltersPage--;
         await loadFilters();
@@ -535,7 +564,6 @@
 
       success = "User role updated successfully";
 
-      // Refresh current page data from server
       await loadUsers();
       showUserModal = false;
     } catch (err) {
@@ -547,18 +575,15 @@
   function logout() {
     localStorage.removeItem("user");
 
-    // Check if we're on a subdomain
     const currentHost = window.location.host;
     const mainHost = getHost();
 
     if (currentHost !== mainHost) {
-      // We're on a subdomain, redirect to main domain with logout parameter
       const protocol = window.location.protocol;
       const logoutUrl = `${protocol}//${mainHost}/login?logout=true`;
       console.log("Redirecting to main domain for logout:", logoutUrl);
       window.location.href = logoutUrl;
     } else {
-      // We're on main domain, just go to login
       goto("/login");
     }
   }
@@ -568,9 +593,8 @@
     success = "";
   }
 
-  // Reset pagination when switching sections
   async function switchSection(newSection) {
-    if (activeSection === newSection) return; // Don't switch if already on the same section
+    if (activeSection === newSection) return;
 
     activeSection = newSection;
     if (newSection === "users") {
@@ -621,7 +645,6 @@
     }
   }
 
-  // User pagination functions
   async function goToUsersPage(page) {
     if (page >= 1 && page <= totalUsersPages && !loadingUsers) {
       currentUsersPage = page;
@@ -643,7 +666,6 @@
     }
   }
 
-  // Price plan pagination functions
   async function goToPlansPage(page) {
     if (page >= 1 && page <= totalPlansPages && !loadingPlans) {
       currentPlansPage = page;
@@ -672,82 +694,10 @@
 </svelte:head>
 
 <div class="app-container">
-  <header class="header">
-    <div class="header-content">
-      <h1 class="logo">
-        <div></div>
-        Welcome Admin
-      </h1>
-      <!-- <div class="header-actions">
-        <span class="welcome-text">Welcome, {user?.name || "Super Admin"}</span>
-        
-      </div> -->
-      <button class="action-btn primary">
-        <span class="btn-icon"><Plus /></span>
-        Create Filter
-      </button>
-    </div>
-  </header>
-  <aside class="sidebar">
-    <nav class="sidebar-nav">
-      <h1 class="logo">
-        <span class="logo-icon"><Logo /></span> MyAR
-      </h1>
-      <button
-        class="nav-item {activeSection === 'dashboard' ? 'active' : ''}"
-        on:click={() => switchSection("dashboard")}
-      >
-        <LayoutDashboard size="20" />
-        <span>Dashboard</span>
-      </button>
-      <!-- <button
-          class="nav-item {activeSection === 'users' ? 'active' : ''}"
-          on:click={() => switchSection('users')}
-        >
-          <Users size=20 />
-          <span>User Management</span>
-        </button> -->
-      <button
-        class="nav-item {activeSection === 'filters' ? 'active' : ''}"
-        on:click={() => switchSection("filters")}
-      >
-        <Palette size="20" />
-        <span>Filter</span>
-      </button>
-      <button
-        class="nav-item {activeSection === 'reports' ? 'active' : ''}"
-        on:click={() => switchSection("reports")}
-      >
-        <Proportions size="20" />
-        <span>Reports</span>
-      </button>
-      <button
-        class="nav-item {activeSection === 'profile' ? 'active' : ''}"
-        on:click={() => switchSection("profile")}
-      >
-        <User2 size="20" />
-        <span>Profile</span>
-      </button>
-
-      <button
-        class="nav-item {activeSection === 'plans' ? 'active' : ''}"
-        on:click={() => switchSection("plans")}
-      >
-        <CreditCard size="20" />
-        <span>Plans</span>
-      </button>
-
-      <button class="nav-item" on:click={logout}>
-        <LogOut size="20" />
-        <span>Logout</span>
-      </button>
-    </nav>
-  </aside>
+  <Header {user} />
+  <Sidebar {activeSection} {switchSection} {logout} />
 
   <div class="main-layout">
-    <!-- Sidebar Navigation -->
-
-    <!-- Main Content Area -->
     <main class="main-content">
       <!-- Messages -->
       {#if error}
@@ -766,679 +716,418 @@
         </div>
       {/if}
 
-      <!-- Dashboard Section -->
-      {#if activeSection === "dashboard"}
-        <div class="dashboard">
-          <!-- Top Stats -->
-          <div class="stats-grid">
-            <div class="stat-card blue">
-              <div>
-                <h3>App Opens</h3>
-              </div>
-              <div class="icon">
-                <img src={mobile} alt="" />
-                <p class="text">1,234</p>
-              </div>
-            </div>
-
-            <div class="stat-card green">
-              <div>
-                <h3>Camera Access</h3>
-              </div>
-              <div class="icon">
-                <img src={camera} alt="" />
-                <p class="text">876</p>
-              </div>
-            </div>
-
-            <div class="stat-card purple">
-              <div>
-                <h3>Media Captured</h3>
-              </div>
-              <div class="icon">
-                <img src={photo} alt="" />
-                <p class="text">543</p>
-              </div>
-            </div>
-
-            <div class="stat-card red">
-              <div>
-                <h3>App Dropouts</h3>
-              </div>
-              <div class="icon">
-                <img src={cross} alt="" />
-
-                <p class="text">211</p>
-              </div>
-            </div>
+      <!-- Welcome Header Section -->
+      <div class="welcome-header">
+        <div class="welcome-section">
+          <div class="welcome-content">
+            <h1 class="welcome-title">
+              Welcome <span class="section-highlight">{sectionTitle}</span>
+            </h1>
           </div>
 
-          <!-- Charts Section -->
-          <div class="charts-grid">
-            <div class="chart-card">
-              <h4>Sharing Platforms</h4>
-              <img src={piechart} alt="" class="pie" />
-
-              <canvas id="sharingChart"> </canvas>
-            </div>
-            <div class="chart-card">
-              <h4>User Locations</h4>
-              <img src={graph} alt="" class="graph" />
-
-              <canvas id="locationChart"></canvas>
-            </div>
-          </div>
-
-          <!-- Filter Usage Table -->
-          <div class="table-card">
-            <h4>Filter Usage Data</h4>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Org Details</th>
-                  <th>Filter Creation</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>
-                    <img src={filter} class="filter-img" alt="Shriram" />
-                    Shriram
-                  </td>
-                  <td>Org A</td>
-                  <td>12 Jan 2025</td>
-                </tr>
-                <tr>
-                  <td>
-                    <img src={filter} class="filter-img" alt="AsoB" />
-                    AsoB
-                  </td>
-                  <td>Org B</td>
-                  <td>15 Feb 2025</td>
-                </tr>
-                <tr>
-                  <td>
-                    <img src={filter} class="filter-img" alt="Sepia" />
-                    Sepia
-                  </td>
-                  <td>Org C</td>
-                  <td>28 Mar 2025</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      {/if}
-
-      <!-- Users Section -->
-      {#if activeSection === "users"}
-        <div class="section-content">
-          <div class="section-header">
-            <h2 class="section-title">User Management</h2>
-            <button
-              class="action-btn primary"
-              on:click={() => (showCreateAdminModal = true)}
-            >
-              <span class="btn-icon"><Plus /></span>
-              Create User Account
-            </button>
-          </div>
-
-          <div class="table-container">
-            {#if loadingUsers}
-              <div class="loading-container">
-                <div class="loading-spinner"></div>
-                <p class="loading-text">Loading users...</p>
-              </div>
-            {:else}
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Role</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each users as user}
-                    <tr>
-                      <td class="user-name">
-                        <div class="user-avatar">
-                          {user.name.charAt(0).toUpperCase()}
-                        </div>
-                        {user.name}
-                      </td>
-                      <td>{user.email}</td>
-                      <td>{user.phone || "N/A"}</td>
-                      <td>
-                        <span class="role-badge {getUserRoleBadge(user.role)}">
-                          {user.role}
-                        </span>
-                      </td>
-                      <td>{formatDate(user.created_at)}</td>
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            class="action-btn small"
-                            on:click={() => {
-                              selectedUser = user;
-                              showUserModal = true;
-                            }}
-                          >
-                            <Pencil size="18" />
-                          </button>
-                          {#if user.role !== "super_admin"}
-                            <button
-                              class="action-btn small danger"
-                              on:click={() => handleDeleteUser(user.id)}
-                            >
-                              <Trash2 size="18" />
-                            </button>
-                          {/if}
-                        </div>
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            {/if}
-          </div>
-
-          <!-- User Pagination Controls -->
-          {#if totalUsersPages > 1}
-            <div class="pagination">
-              <div class="pagination-info">
-                Showing {Math.min(
-                  (currentUsersPage - 1) * usersPerPage + 1,
-                  totalUsers
-                )} to {Math.min(currentUsersPage * usersPerPage, totalUsers)} of
-                {totalUsers} users
-              </div>
-              <div class="pagination-controls">
-                <button
-                  class="pagination-btn"
-                  disabled={currentUsersPage === 1 || loadingUsers}
-                  on:click={prevUsersPage}
-                >
-                  ← Previous
-                </button>
-
-                {#each Array(totalUsersPages)
-                  .fill()
-                  .map((_, i) => i + 1) as page}
-                  {#if page === 1 || page === totalUsersPages || (page >= currentUsersPage - 2 && page <= currentUsersPage + 2)}
-                    <button
-                      class="pagination-btn"
-                      class:active={page === currentUsersPage}
-                      disabled={loadingUsers}
-                      on:click={() => goToUsersPage(page)}
-                    >
-                      {page}
-                    </button>
-                  {:else if page === currentUsersPage - 3 || page === currentUsersPage + 3}
-                    <span class="pagination-ellipsis">...</span>
-                  {/if}
-                {/each}
-
-                <button
-                  class="pagination-btn"
-                  disabled={currentUsersPage === totalUsersPages ||
-                    loadingUsers}
-                  on:click={nextUsersPage}
-                >
-                  Next →
-                </button>
-              </div>
-            </div>
-          {/if}
-        </div>
-      {/if}
-
-      <!-- Filters Section -->
-      {#if activeSection === "filters"}
-        <!-- <div class="section-content">
-          <div class="section-header">
-            <h2 class="section-title">Filter Management</h2>
-            <div class="filter-controls">
-              <label class="toggle-container">
-                <input
-                  type="checkbox"
-                  bind:checked={includeDeletedFilters}
-                  class="toggle-checkbox"
-                />
-                <span class="toggle-label">Show deleted filters</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="table-container">
-            {#if loadingFilters}
-              <div class="loading-container">
-                <div class="loading-spinner"></div>
-                <p class="loading-text">Loading filters...</p>
-              </div>
-            {:else}
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Preview</th>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>Owner</th>
-                    <th>AI Enhanced</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each filters as filter}
-                    <tr>
-                      <td>
-                        <div class="filter-preview">
-                          <img
-                            src={filter.filter_url}
-                            alt={filter.name}
-                            class="preview-img"
-                          />
-                        </div>
-                      </td>
-                      <td class="filter-name">{filter.name}</td>
-                      <td class="filter-description">
-                        {filter.description || "No description"}
-                      </td>
-                      <td>{filter.user_name || "Unknown"}</td>
-                      <td>
-                        <span
-                          class="ai-badge {filter.ai_need ? 'ai-yes' : 'ai-no'}"
-                        >
-                          {filter.ai_need ? "Yes" : "No"}
-                        </span>
-                      </td>
-                      <td>{formatDate(filter.created_at)}</td>
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            class="action-btn small"
-                            on:click={() => {
-                              selectedFilter = filter;
-                              showFilterModal = true;
-                            }}
-                          >
-                            <Eye size="18" />
-                          </button>
-                          <button
-                            class="action-btn small danger"
-                            on:click={() => handleDeleteFilter(filter.id)}
-                          >
-                            <Trash2 size="18" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            {/if}
-          </div>
-
-          {#if totalFiltersPages > 1}
-            <div class="pagination">
-              <div class="pagination-info">
-                Showing {Math.min(
-                  (currentFiltersPage - 1) * filtersPerPage + 1,
-                  totalFilters
-                )} to {Math.min(
-                  currentFiltersPage * filtersPerPage,
-                  totalFilters
-                )} of {totalFilters} filters
-              </div>
-              <div class="pagination-controls">
-                <button
-                  class="pagination-btn"
-                  disabled={currentFiltersPage === 1 || loadingFilters}
-                  on:click={prevPage}
-                >
-                  ← Previous
-                </button>
-
-                {#each Array(totalFiltersPages)
-                  .fill()
-                  .map((_, i) => i + 1) as page}
-                  {#if page === 1 || page === totalFiltersPages || (page >= currentFiltersPage - 2 && page <= currentFiltersPage + 2)}
-                    <button
-                      class="pagination-btn"
-                      class:active={page === currentFiltersPage}
-                      disabled={loadingFilters}
-                      on:click={() => goToPage(page)}
-                    >
-                      {page}
-                    </button>
-                  {:else if page === currentFiltersPage - 3 || page === currentFiltersPage + 3}
-                    <span class="pagination-ellipsis">...</span>
-                  {/if}
-                {/each}
-
-                <button
-                  class="pagination-btn"
-                  disabled={currentFiltersPage === totalFiltersPages ||
-                    loadingFilters}
-                  on:click={nextPage}
-                >
-                  Next →
-                </button>
-              </div>
-            </div>
-          {/if}
-        </div> -->
-
-        <div class="filters-page">
-          <h2>Filters for Shriram</h2>
-
-          <div class="filters-grid">
-            <!-- Filter Card -->
-            <div class="filter-card">
-              <img src={filter} alt="Vintage" />
-              <div class="filter-info">
-                <h3>Vintage</h3>
-                <p class="date">Created 1/15/2024</p>
-                <div class="stats">
-                  <span>👁 1,250</span>
-                  <span>⬇ 850</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="filter-card">
-              <img src={filter} alt="Vintage" />
-              <div class="filter-info">
-                <h3>Black & White</h3>
-                <p class="date">Created 2/10/2024</p>
-                <div class="stats">
-                  <span>👁 980</span>
-                  <span>⬇ 720</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="filter-card">
-              <img src={filter} alt="Vintage" />
-              <div class="filter-info">
-                <h3>Sepia</h3>
-                <p class="date">Created 3/5/2024</p>
-                <div class="stats">
-                  <span>👁 650</span>
-                  <span>⬇ 480</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="filter-card">
-              <img src={filter} alt="Vintage" />
-              <div class="filter-info">
-                <h3>Sepia</h3>
-                <p class="date">Created 3/5/2024</p>
-                <div class="stats">
-                  <span>👁 650</span>
-                  <span>⬇ 480</span>
-                </div>
-              </div>
-            </div>
-            <div class="filter-card">
-              <img src={filter} alt="Vintage" />
-              <div class="filter-info">
-                <h3>Sepia</h3>
-                <p class="date">Created 3/5/2024</p>
-                <div class="stats">
-                  <span>👁 650</span>
-                  <span>⬇ 480</span>
-                </div>
-              </div>
-            </div>
-            <div class="filter-card">
-              <img src={filter} alt="Vintage" />
-              <div class="filter-info">
-                <h3>Sepia</h3>
-                <p class="date">Created 3/5/2024</p>
-                <div class="stats">
-                  <span>👁 650</span>
-                  <span>⬇ 480</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      {/if}
-
-      <!-- Price Plans Section -->
-      {#if activeSection === "plans"}
-        <div class="section-content">
-          <div class="section-header">
-            <h2 class="section-title">Price Plan Management</h2>
-            <button
-              class="action-btn primary"
-              on:click={() => (showCreatePlanModal = true)}
-            >
-              <span class="btn-icon"><Plus /></span>
-              Create Price Plan
-            </button>
-          </div>
-
-          {#if loadingPlans}
-            <div class="loading-container">
-              <div class="loading-spinner"></div>
-              <p class="loading-text">Loading price plans...</p>
-            </div>
-          {:else if pricePlans.length === 0}
-            <div class="loading-container">
-              <div class="empty-icon">📋</div>
-              <h3 class="empty-title">No Price Plans Found</h3>
-              <p class="empty-text">
-                Start by creating your first price plan to offer different
-                subscription tiers to your users.
-              </p>
-              <button
-                class="action-btn primary"
-                on:click={() => (showCreatePlanModal = true)}
-              >
+          {#if !showImageUpload}
+            <div class="welcome-actions">
+              <button class="action-btn primary" on:click={handleCreateFilter}>
                 <span class="btn-icon"><Plus /></span>
-                Create First Price Plan
+                Create Filter
               </button>
             </div>
-          {:else}
-            <div class="table-container">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Plan Name</th>
-                    <th>Monthly Price</th>
-                    <th>Yearly Price</th>
-                    <th>Filters</th>
-                    <th>AI Elements</th>
-                    <th>Storage</th>
-                    <th>Features</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each pricePlans as plan (plan.id)}
-                    <tr>
-                      <td>
-                        <div class="plan-name">
-                          <strong>{plan.name}</strong>
-                        </div>
-                      </td>
-                      <td>
-                        <span class="price">₹{plan.monthly_price}</span>
-                      </td>
-                      <td>
-                        <span class="price">₹{plan.yearly_price}</span>
-                      </td>
-                      <td>
-                        <span class="feature-value"
-                          >{plan.filters || "Unlimited"}</span
-                        >
-                      </td>
-                      <td>
-                        <span class="feature-value"
-                          >{plan.ai_elements || "Unlimited"}</span
-                        >
-                      </td>
-                      <td>
-                        <span class="feature-value"
-                          >{plan.storage || "Unlimited"}</span
-                        >
-                      </td>
-                      <td>
-                        <span class="feature-value truncate"
-                          >{plan.features || "N/A"}</span
-                        >
-                      </td>
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            class="action-btn small secondary"
-                            on:click={() => openPlanModal(plan)}
-                          >
-                            <span class="btn-icon"><Eye size="18" /></span>
-                          </button>
-                          <button
-                            class="action-btn small danger"
-                            on:click={() => handleDeletePlan(plan.id)}
-                          >
-                            <span class="btn-icon"><Trash2 size="18" /></span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
+          {/if}
+        </div>
 
-              <!-- Price Plans Pagination -->
-              {#if totalPlansPages > 1}
+        <!-- Image Upload Section -->
+        {#if showImageUpload}
+          <div>
+            <ImageUpload
+              {isUploading}
+              {uploadSuccess}
+              errorMsg={error}
+              {transparencyInfo}
+              on:fileSelected={handleFileSelected}
+            />
+          </div>
+        {:else}
+          <!-- Dashboard Section -->
+          {#if activeSection === "dashboard"}
+            <Dashboard />
+          {/if}
+
+          <!-- Users Section -->
+          <!-- {#if activeSection === "users"}
+            <div class="section-content">
+              <div class="section-header">
+                <h2 class="section-title">User Management</h2>
+                <button
+                  class="action-btn primary"
+                  on:click={() => (showCreateAdminModal = true)}
+                >
+                  <span class="btn-icon"><Plus /></span>
+                  Create User Account
+                </button>
+              </div>
+
+              <div class="table-container">
+                {#if loadingUsers}
+                  <div class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p class="loading-text">Loading users...</p>
+                  </div>
+                {:else}
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Role</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {#each users as user}
+                        <tr>
+                          <td class="user-name">
+                            <div class="user-avatar">
+                              {user.name.charAt(0).toUpperCase()}
+                            </div>
+                            {user.name}
+                          </td>
+                          <td>{user.email}</td>
+                          <td>{user.phone || "N/A"}</td>
+                          <td>
+                            <span
+                              class="role-badge {getUserRoleBadge(user.role)}"
+                            >
+                              {user.role}
+                            </span>
+                          </td>
+                          <td>{formatDate(user.created_at)}</td>
+                          <td>
+                            <div class="action-buttons">
+                              <button
+                                class="action-btn small"
+                                on:click={() => {
+                                  selectedUser = user;
+                                  showUserModal = true;
+                                }}
+                              >
+                                <Pencil size="18" />
+                              </button>
+                              {#if user.role !== "super_admin"}
+                                <button
+                                  class="action-btn small danger"
+                                  on:click={() => handleDeleteUser(user.id)}
+                                >
+                                  <Trash2 size="18" />
+                                </button>
+                              {/if}
+                            </div>
+                          </td>
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
+                {/if}
+              </div>
+
+              {#if totalUsersPages > 1}
                 <div class="pagination">
                   <div class="pagination-info">
-                    Showing {(currentPlansPage - 1) * plansPerPage + 1} to {Math.min(
-                      currentPlansPage * plansPerPage,
-                      totalPlans
-                    )} of {totalPlans} price plans
+                    Showing {Math.min(
+                      (currentUsersPage - 1) * usersPerPage + 1,
+                      totalUsers
+                    )} to {Math.min(
+                      currentUsersPage * usersPerPage,
+                      totalUsers
+                    )} of
+                    {totalUsers} users
                   </div>
                   <div class="pagination-controls">
                     <button
                       class="pagination-btn"
-                      disabled={currentPlansPage === 1 || loadingPlans}
-                      on:click={prevPlansPage}
+                      disabled={currentUsersPage === 1 || loadingUsers}
+                      on:click={prevUsersPage}
                     >
-                      « Previous
+                      ← Previous
                     </button>
 
-                    {#if totalPlansPages <= 5}
-                      {#each Array(totalPlansPages) as _, i}
+                    {#each Array(totalUsersPages)
+                      .fill()
+                      .map((_, i) => i + 1) as page}
+                      {#if page === 1 || page === totalUsersPages || (page >= currentUsersPage - 2 && page <= currentUsersPage + 2)}
                         <button
                           class="pagination-btn"
-                          class:active={currentPlansPage === i + 1}
-                          disabled={loadingPlans}
-                          on:click={() => goToPlansPage(i + 1)}
+                          class:active={page === currentUsersPage}
+                          disabled={loadingUsers}
+                          on:click={() => goToUsersPage(page)}
                         >
-                          {i + 1}
+                          {page}
                         </button>
-                      {/each}
-                    {:else if currentPlansPage <= 3}
-                      {#each Array(3) as _, i}
-                        <button
-                          class="pagination-btn"
-                          class:active={currentPlansPage === i + 1}
-                          disabled={loadingPlans}
-                          on:click={() => goToPlansPage(i + 1)}
-                        >
-                          {i + 1}
-                        </button>
-                      {/each}
-                      <span class="pagination-ellipsis">...</span>
-                      <button
-                        class="pagination-btn"
-                        disabled={loadingPlans}
-                        on:click={() => goToPlansPage(totalPlansPages)}
-                      >
-                        {totalPlansPages}
-                      </button>
-                    {:else if currentPlansPage >= totalPlansPages - 2}
-                      <button
-                        class="pagination-btn"
-                        disabled={loadingPlans}
-                        on:click={() => goToPlansPage(1)}
-                      >
-                        1
-                      </button>
-                      <span class="pagination-ellipsis">...</span>
-                      {#each Array(3) as _, i}
-                        <button
-                          class="pagination-btn"
-                          class:active={currentPlansPage ===
-                            totalPlansPages - 2 + i}
-                          disabled={loadingPlans}
-                          on:click={() =>
-                            goToPlansPage(totalPlansPages - 2 + i)}
-                        >
-                          {totalPlansPages - 2 + i}
-                        </button>
-                      {/each}
-                    {:else}
-                      <button
-                        class="pagination-btn"
-                        disabled={loadingPlans}
-                        on:click={() => goToPlansPage(1)}
-                      >
-                        1
-                      </button>
-                      <span class="pagination-ellipsis">...</span>
-                      {#each Array(3) as _, i}
-                        <button
-                          class="pagination-btn"
-                          class:active={currentPlansPage ===
-                            currentPlansPage - 1 + i}
-                          disabled={loadingPlans}
-                          on:click={() =>
-                            goToPlansPage(currentPlansPage - 1 + i)}
-                        >
-                          {currentPlansPage - 1 + i}
-                        </button>
-                      {/each}
-                      <span class="pagination-ellipsis">...</span>
-                      <button
-                        class="pagination-btn"
-                        disabled={loadingPlans}
-                        on:click={() => goToPlansPage(totalPlansPages)}
-                      >
-                        {totalPlansPages}
-                      </button>
-                    {/if}
+                      {:else if page === currentUsersPage - 3 || page === currentUsersPage + 3}
+                        <span class="pagination-ellipsis">...</span>
+                      {/if}
+                    {/each}
 
                     <button
                       class="pagination-btn"
-                      disabled={currentPlansPage === totalPlansPages ||
-                        loadingPlans}
-                      on:click={nextPlansPage}
+                      disabled={currentUsersPage === totalUsersPages ||
+                        loadingUsers}
+                      on:click={nextUsersPage}
                     >
-                      Next »
+                      Next →
                     </button>
                   </div>
                 </div>
               {/if}
             </div>
+          {/if} -->
+
+          <!-- Filters Section -->
+          {#if activeSection === "filters"}
+            <ImageUpload
+              {isUploading}
+              {uploadSuccess}
+              errorMsg={error}
+              {transparencyInfo}
+              on:fileSelected={handleFileSelected}
+            />
+
+            <FilterGrid />
           {/if}
-        </div>
-      {/if}
+          {#if activeSection === "clients"}
+            <Client />
+          {/if}
+
+          <!-- Price Plans Section -->
+          <!-- {#if activeSection === "plans"}
+            <div class="section-content">
+              <div class="section-header">
+                <h2 class="section-title">Price Plan Management</h2>
+                <button
+                  class="action-btn primary"
+                  on:click={() => (showCreatePlanModal = true)}
+                >
+                  <span class="btn-icon"><Plus /></span>
+                  Create Price Plan
+                </button>
+              </div>
+
+              {#if loadingPlans}
+                <div class="loading-container">
+                  <div class="loading-spinner"></div>
+                  <p class="loading-text">Loading price plans...</p>
+                </div>
+              {:else if pricePlans.length === 0}
+                <div class="loading-container">
+                  <div class="empty-icon">📋</div>
+                  <h3 class="empty-title">No Price Plans Found</h3>
+                  <p class="empty-text">
+                    Start by creating your first price plan to offer different
+                    subscription tiers to your users.
+                  </p>
+                  <button
+                    class="action-btn primary"
+                    on:click={() => (showCreatePlanModal = true)}
+                  >
+                    <span class="btn-icon"><Plus /></span>
+                    Create First Price Plan
+                  </button>
+                </div>
+              {:else}
+                <div class="table-container">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Plan Name</th>
+                        <th>Monthly Price</th>
+                        <th>Yearly Price</th>
+                        <th>Filters</th>
+                        <th>AI Elements</th>
+                        <th>Storage</th>
+                        <th>Features</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {#each pricePlans as plan (plan.id)}
+                        <tr>
+                          <td>
+                            <div class="plan-name">
+                              <strong>{plan.name}</strong>
+                            </div>
+                          </td>
+                          <td>
+                            <span class="price">₹{plan.monthly_price}</span>
+                          </td>
+                          <td>
+                            <span class="price">₹{plan.yearly_price}</span>
+                          </td>
+                          <td>
+                            <span class="feature-value"
+                              >{plan.filters || "Unlimited"}</span
+                            >
+                          </td>
+                          <td>
+                            <span class="feature-value"
+                              >{plan.ai_elements || "Unlimited"}</span
+                            >
+                          </td>
+                          <td>
+                            <span class="feature-value"
+                              >{plan.storage || "Unlimited"}</span
+                            >
+                          </td>
+                          <td>
+                            <span class="feature-value truncate"
+                              >{plan.features || "N/A"}</span
+                            >
+                          </td>
+                          <td>
+                            <div class="action-buttons">
+                              <button
+                                class="action-btn small secondary"
+                                on:click={() => openPlanModal(plan)}
+                              >
+                                <span class="btn-icon"><Eye size="18" /></span>
+                              </button>
+                              <button
+                                class="action-btn small danger"
+                                on:click={() => handleDeletePlan(plan.id)}
+                              >
+                                <span class="btn-icon"
+                                  ><Trash2 size="18" /></span
+                                >
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
+
+                  {#if totalPlansPages > 1}
+                    <div class="pagination">
+                      <div class="pagination-info">
+                        Showing {(currentPlansPage - 1) * plansPerPage + 1} to {Math.min(
+                          currentPlansPage * plansPerPage,
+                          totalPlans
+                        )} of {totalPlans} price plans
+                      </div>
+                      <div class="pagination-controls">
+                        <button
+                          class="pagination-btn"
+                          disabled={currentPlansPage === 1 || loadingPlans}
+                          on:click={prevPlansPage}
+                        >
+                          « Previous
+                        </button>
+
+                        {#if totalPlansPages <= 5}
+                          {#each Array(totalPlansPages) as _, i}
+                            <button
+                              class="pagination-btn"
+                              class:active={currentPlansPage === i + 1}
+                              disabled={loadingPlans}
+                              on:click={() => goToPlansPage(i + 1)}
+                            >
+                              {i + 1}
+                            </button>
+                          {/each}
+                        {:else if currentPlansPage <= 3}
+                          {#each Array(3) as _, i}
+                            <button
+                              class="pagination-btn"
+                              class:active={currentPlansPage === i + 1}
+                              disabled={loadingPlans}
+                              on:click={() => goToPlansPage(i + 1)}
+                            >
+                              {i + 1}
+                            </button>
+                          {/each}
+                          <span class="pagination-ellipsis">...</span>
+                          <button
+                            class="pagination-btn"
+                            disabled={loadingPlans}
+                            on:click={() => goToPlansPage(totalPlansPages)}
+                          >
+                            {totalPlansPages}
+                          </button>
+                        {:else if currentPlansPage >= totalPlansPages - 2}
+                          <button
+                            class="pagination-btn"
+                            disabled={loadingPlans}
+                            on:click={() => goToPlansPage(1)}
+                          >
+                            1
+                          </button>
+                          <span class="pagination-ellipsis">...</span>
+                          {#each Array(3) as _, i}
+                            <button
+                              class="pagination-btn"
+                              class:active={currentPlansPage ===
+                                totalPlansPages - 2 + i}
+                              disabled={loadingPlans}
+                              on:click={() =>
+                                goToPlansPage(totalPlansPages - 2 + i)}
+                            >
+                              {totalPlansPages - 2 + i}
+                            </button>
+                          {/each}
+                        {:else}
+                          <button
+                            class="pagination-btn"
+                            disabled={loadingPlans}
+                            on:click={() => goToPlansPage(1)}
+                          >
+                            1
+                          </button>
+                          <span class="pagination-ellipsis">...</span>
+                          {#each Array(3) as _, i}
+                            <button
+                              class="pagination-btn"
+                              class:active={currentPlansPage ===
+                                currentPlansPage - 1 + i}
+                              disabled={loadingPlans}
+                              on:click={() =>
+                                goToPlansPage(currentPlansPage - 1 + i)}
+                            >
+                              {currentPlansPage - 1 + i}
+                            </button>
+                          {/each}
+                          <span class="pagination-ellipsis">...</span>
+                          <button
+                            class="pagination-btn"
+                            disabled={loadingPlans}
+                            on:click={() => goToPlansPage(totalPlansPages)}
+                          >
+                            {totalPlansPages}
+                          </button>
+                        {/if}
+
+                        <button
+                          class="pagination-btn"
+                          disabled={currentPlansPage === totalPlansPages ||
+                            loadingPlans}
+                          on:click={nextPlansPage}
+                        >
+                          Next »
+                        </button>
+                      </div>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          {/if} -->
+        {/if}
+      </div>
     </main>
   </div>
 </div>
 
 <!-- Create User Modal -->
-{#if showCreateAdminModal}
+<!-- {#if showCreateAdminModal}
   <div class="modal-overlay" on:click={() => (showCreateAdminModal = false)}>
     <div class="modal" on:click|stopPropagation>
       <div class="modal-header">
@@ -1505,10 +1194,10 @@
       </div>
     </div>
   </div>
-{/if}
+{/if} -->
 
 <!-- User Edit Modal -->
-{#if showUserModal && selectedUser}
+<!-- {#if showUserModal && selectedUser}
   <div class="modal-overlay" on:click={() => (showUserModal = false)}>
     <div class="modal" on:click|stopPropagation>
       <div class="modal-header">
@@ -1564,10 +1253,10 @@
       </div>
     </div>
   </div>
-{/if}
+{/if} -->
 
 <!-- Filter View Modal -->
-{#if showFilterModal && selectedFilter}
+<!-- {#if showFilterModal && selectedFilter}
   <div class="modal-overlay" on:click={() => (showFilterModal = false)}>
     <div class="modal large" on:click|stopPropagation>
       <div class="modal-header">
@@ -1629,10 +1318,10 @@
       </div>
     </div>
   </div>
-{/if}
+{/if} -->
 
 <!-- Create Price Plan Modal -->
-{#if showCreatePlanModal}
+<!-- {#if showCreatePlanModal}
   <div class="modal-overlay" on:click={() => (showCreatePlanModal = false)}>
     <div class="modal" on:click|stopPropagation>
       <div class="modal-header">
@@ -1744,10 +1433,10 @@
       </div>
     </div>
   </div>
-{/if}
+{/if} -->
 
 <!-- Price Plan View/Edit Modal -->
-{#if showPlanModal && selectedPlan}
+<!-- {#if showPlanModal && selectedPlan}
   <div class="modal-overlay" on:click={() => (showPlanModal = false)}>
     <div class="modal" on:click|stopPropagation>
       <div class="modal-header">
@@ -1925,7 +1614,7 @@
       </div>
     </div>
   </div>
-{/if}
+{/if} -->
 
 <style>
   :global(body) {
@@ -1936,207 +1625,91 @@
     min-height: 100vh;
   }
 
-  .logo-gradient {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
   .app-container {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
   }
-  .header {
-    background: white;
-    position: fixed;
-    z-index: 100;
-    width: calc(100vw - 250px); /* Full viewport width */
 
-    height: 7.5vh;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    border-bottom: 1px solid #e2e8f0;
-    padding: 1rem 0;
-    top: 0;
-    left: 250px; /* Move header to start after sidebar */
-  }
-
-  .header-content {
-    max-width: 100vw;
-    margin: 0 auto;
-    padding: 0 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    height: 100%;
-    padding-right: 44px;
-  }
-
-  .logo {
-    color: #2d3748;
-    font-size: 1rem;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-left: 1rem;
-  }
-
-  .header-actions {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .welcome-text {
-    color: #4a5568;
-    font-weight: 500;
-    margin-right: 1rem;
-  }
-
-  /* .logout-btn {
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 0.8rem 1.5rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
-  } */
-
-  /* .logout-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
-  } */
-
-  /* Main Layout with Sidebar */
-  /* Main Layout with Sidebar */
   .main-layout {
     display: flex;
     flex: 1;
-    max-width: 100vw;
     margin: 0 auto;
     width: 100%;
     box-sizing: border-box;
-    margin-top: 8vh; /* Add margin to account for fixed header */
-  }
-
-  .sidebar {
-    height: 100vh; /* Subtract header height */
-    z-index: 100;
-    position: fixed;
-    width: 250px;
-    background: white;
-    border-right: 1px solid #e2e8f0;
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-    padding: 0.5rem 0;
-    overflow-y: auto; /* Add scroll if content overflows */
+    margin-top: 2rem;
   }
 
   .main-content {
     flex: 1;
     padding: 2rem;
     overflow-y: auto;
-    margin-left: 250px; /* Push content to the right of sidebar */
-    width: calc(100vw - 250px); /* Calculate width minus sidebar */
-    min-height: calc(100vh - 8vh); /* Full height minus header */
+    margin-left: 250px;
+    width: calc(100vw - 250px);
     box-sizing: border-box;
+    transition: all 0.3s ease;
+  }
+
+  /* Image Upload Section Styles */
+  .image-upload-section {
+    background: white;
+    border-radius: 20px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e2e8f0;
   }
 
   /* Responsive Design */
+  /* Medium and small screens (matches sidebar breakpoint) */
+  @media (max-width: 1024px) {
+    .main-content {
+      margin-left: 60px;
+      width: calc(100vw - 60px);
+      padding: 1.5rem;
+    }
+
+    .image-upload-section {
+      padding: 1.5rem;
+    }
+  }
+
+  /* Small screens */
   @media (max-width: 768px) {
     .main-layout {
-      flex-direction: column;
-      margin-top: 8vh;
+      margin-top: auto;
     }
 
-    .sidebar {
-      position: static; /* Remove fixed positioning on mobile */
-      width: 100%;
-      height: auto;
-      margin-top: 0;
-      border-right: none;
-      border-bottom: 1px solid #e2e8f0;
-      padding: 1rem 0;
+    .main-content {
+      margin-left: 60px;
+      width: calc(100vw - 60px);
+      padding: 1rem;
     }
 
+    .image-upload-section {
+      padding: 1rem;
+    }
+  }
+
+  /* Extra small screens */
+  @media (max-width: 640px) {
     .main-content {
       margin-left: 0;
       width: 100%;
       padding: 1rem;
-      min-height: auto;
-    }
-
-    .sidebar-nav {
-      flex-direction: row;
-      overflow-x: auto;
-      padding: 0 1rem;
-    }
-
-    .nav-item {
-      flex-shrink: 0;
-      border-left: none;
-      border-bottom: 4px solid transparent;
-      padding: 0.75rem 1rem;
-    }
-
-    .nav-item.active {
-      border-left: none;
-      border-bottom-color: #4c51bf;
     }
   }
 
+  /* Very small screens */
   @media (max-width: 480px) {
     .main-content {
-      padding: 0.5rem;
+      padding: 0.8rem;
     }
 
-    .section-content {
+    .image-upload-section {
       padding: 1rem;
+      margin-bottom: 1rem;
     }
-  }
-  .sidebar-nav {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    background: none;
-    border: none;
-    color: #4a5568;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-align: left;
-    border-left: 4px solid transparent;
-  }
-
-  .nav-item:hover {
-    background: #f7fafc;
-    color: #2d3748;
-  }
-
-  .nav-item.active {
-    background: #dbdbdb;
-    color: black;
-    /* border-left-color: #4c51bf; */
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-  }
-
-  .main-content {
-    flex: 1;
-    padding: 2rem;
-    overflow-y: auto;
   }
 
   .alert {
@@ -2813,246 +2386,6 @@
     margin: 0;
   }
 
-  /* Responsive Design */
-  @media (max-width: 768px) {
-    .header-content {
-      flex-direction: column;
-      gap: 1rem;
-      text-align: center;
-    }
-
-    .logo {
-      font-size: 1.5rem;
-    }
-
-    .main-layout {
-      flex-direction: column;
-    }
-
-    .sidebar {
-      width: 100%;
-      border-right: none;
-      border-bottom: 1px solid #e2e8f0;
-      padding: 1rem 0;
-    }
-
-    .sidebar-nav {
-      flex-direction: row;
-      overflow-x: auto;
-      padding: 0 1rem;
-    }
-
-    .nav-item {
-      flex-shrink: 0;
-      border-left: none;
-      border-bottom: 4px solid transparent;
-      padding: 0.75rem 1rem;
-    }
-
-    .nav-item.active {
-      border-left: none;
-      border-bottom-color: #4c51bf;
-    }
-
-    .main-content {
-      padding: 1rem;
-    }
-
-    .section-content {
-      padding: 1rem;
-    }
-
-    .stats-grid {
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 1rem;
-    }
-
-    .stat-card {
-      background: #eaf3ff;
-      border-radius: 12px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-    }
-    .stat-content {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start; /* Ensures both elements start from same left */
-      gap: 8px;
-    }
-
-    .stat-icon {
-      font-size: 2rem;
-    }
-
-    .stat-number {
-      font-size: 1.5rem;
-    }
-
-    .section-header {
-      flex-direction: column;
-      align-items: stretch;
-      text-align: center;
-    }
-
-    .section-title {
-      font-size: 1.5rem;
-    }
-
-    .data-table {
-      font-size: 0.8rem;
-    }
-
-    .data-table th,
-    .data-table td {
-      padding: 0.8rem 0.5rem;
-    }
-
-    /* Make table horizontally scrollable on small screens */
-    .table-container {
-      overflow-x: auto;
-    }
-
-    /* Ensure action column is always visible */
-    .data-table th:last-child,
-    .data-table td:last-child {
-      min-width: 120px;
-      position: sticky;
-      right: 0;
-      background: white;
-      box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .data-table th:last-child {
-      background: #f8fafc;
-    }
-
-    .action-buttons {
-      flex-direction: column;
-      gap: 0.25rem;
-      align-items: stretch;
-    }
-
-    .action-btn.small {
-      padding: 0.4rem 0.8rem;
-      font-size: 0.8rem;
-      min-width: auto;
-      width: 100%;
-    }
-
-    .modal {
-      margin: 0.5rem;
-      max-width: none;
-      max-height: none;
-      height: 100%;
-      border-radius: 12px;
-    }
-
-    .filter-details {
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-
-    .form-actions {
-      flex-direction: column;
-    }
-
-    .role-options {
-      flex-direction: column;
-    }
-
-    .pagination {
-      flex-direction: column;
-      text-align: center;
-      gap: 1rem;
-    }
-
-    .actions-grid {
-      grid-template-columns: 1fr;
-    }
-
-    /* Further improvements for action buttons on very small screens */
-    .action-btn.small {
-      padding: 0.3rem 0.6rem;
-      font-size: 0.75rem;
-    }
-
-    .data-table th:last-child,
-    .data-table td:last-child {
-      min-width: 100px;
-    }
-
-    .pagination-controls {
-      justify-content: center;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .header-actions {
-      flex-direction: column;
-      gap: 0.8rem;
-    }
-
-    .logout-btn {
-      padding: 0.6rem 1.2rem;
-      font-size: 0.9rem;
-    }
-
-    .main-content {
-      padding: 0.5rem;
-    }
-
-    .stats-grid {
-      grid-template-columns: 1fr;
-      gap: 0.75rem;
-    }
-
-    .data-table th,
-    .data-table td {
-      padding: 0.6rem 0.3rem;
-      font-size: 0.75rem;
-    }
-
-    .user-name {
-      flex-direction: column;
-      gap: 0.3rem;
-      text-align: center;
-    }
-
-    .user-avatar {
-      width: 30px;
-      height: 30px;
-      font-size: 0.9rem;
-    }
-
-    .pagination-btn {
-      padding: 0.5rem 0.8rem;
-      font-size: 0.8rem;
-    }
-
-    .pagination-info {
-      font-size: 0.8rem;
-      text-align: center;
-    }
-
-    .modal {
-      border-radius: 0;
-    }
-
-    .modal-header {
-      border-radius: 0;
-    }
-
-    .section-title {
-      font-size: 1.3rem;
-    }
-
-    .action-btn {
-      padding: 0.6rem 1rem;
-      font-size: 0.85rem;
-    }
-  }
-
   /* Price Plan Specific Styles */
   .plan-name {
     font-weight: 600;
@@ -3160,7 +2493,6 @@
 
   /* Stats Cards Grid */
   .stats-grid {
-    margin-top: 20px;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 1.5rem;
@@ -3309,7 +2641,7 @@
     display: flex;
     align-items: center;
     padding: 1rem;
-    border: 1px solid #ccc; /* 👈 add this */
+    border: 1px solid #ccc;
     transition:
       transform 0.2s ease,
       box-shadow 0.2s ease;
@@ -3345,5 +2677,159 @@
     gap: 1.5rem;
     font-size: 0.85rem;
     color: #444;
+  }
+
+  .welcome-header {
+    position: relative;
+  }
+
+  .welcome-section {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .welcome-section::before {
+    content: "";
+    position: absolute;
+    top: -20px;
+    left: -20px;
+    width: 80px;
+    height: 80px;
+    background-size: contain;
+    opacity: 0.7;
+    z-index: 0;
+  }
+
+  .welcome-content {
+    flex: 1;
+    position: relative;
+    z-index: 1;
+  }
+
+  .welcome-title {
+    font-size: 1rem;
+    color: #000000;
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .section-highlight {
+    color: #2563eb;
+    font-weight: 600;
+  }
+
+  .welcome-actions {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .action-btn {
+    background: #000000;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .btn-icon {
+    display: flex;
+    align-items: center;
+  }
+
+  /* Responsive adjustments for main content */
+  @media (max-width: 1024px) {
+    .section-title {
+      font-size: 1.5rem;
+    }
+
+    .section-subtitle {
+      font-size: 1.2rem;
+    }
+
+    .welcome-title {
+      font-size: 0.9rem;
+    }
+
+    .action-btn {
+      padding: 0.6rem 1rem;
+      font-size: 0.8rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .section-title {
+      font-size: 1.3rem;
+    }
+
+    .section-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .welcome-section {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .welcome-actions {
+      width: 100%;
+    }
+
+    .action-btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .stats-grid {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+
+    .charts-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .section-title {
+      font-size: 1.1rem;
+    }
+
+    .welcome-title {
+      font-size: 0.8rem;
+    }
+
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .filters-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .filter-card {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .filter-card img {
+      margin-right: 0;
+      margin-bottom: 1rem;
+    }
   }
 </style>
