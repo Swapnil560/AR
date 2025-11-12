@@ -42,7 +42,7 @@
   import graph from "../../../lib/assets/SVG (4).png";
   import Header from "../../../components/Header.svelte";
   import Sidebar from "../../../components/Sidebar.svelte";
-  import ImageUpload from "./ImageUpload.svelte";
+  import ImageUpload from "./imageUpload.svelte";
   import Client from "./client.svelte";
   import FilterGrid from "./filterGrid.svelte";
   import Filterpage from "./filterpage.svelte";
