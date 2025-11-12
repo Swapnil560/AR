@@ -11,8 +11,8 @@
   export let isAnnual: boolean;
   export let delay: number;
 
-  const price = isAnnual ? annualPrice : monthlyPrice;
-  const period = isAnnual ? "year" : "month";
+  $: price = isAnnual ? annualPrice : monthlyPrice;
+  $: period = isAnnual ? "year" : "month";
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("en-IN", {

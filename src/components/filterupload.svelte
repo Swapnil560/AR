@@ -5,11 +5,11 @@
     compressImage,
     validateTransparency,
   } from "$lib/imageUpload";
-  import { saveFilter } from "../../../services/actions/filter.js";
-  import { RazorpayService } from "../../../lib/razorpay.js";
+  import { saveFilter } from "../services/actions/filter.js";
+  import { RazorpayService } from "../lib/razorpay.js";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import Logo from "../../../components/logo.svelte";
+  import Logo from "./logo.svelte";
   import { getHost } from "$lib/utils";
   import {
     ArrowDownToLine,
@@ -28,7 +28,7 @@
     TriangleAlert,
   } from "@lucide/svelte";
   import { logEvent } from "$lib/logHelper.js";
-  import { ChevronDown, Share } from "lucide-svelte";
+  import { Share } from "lucide-svelte";
 
   let file: File | null = null;
   let filterPreview: string | null = null;
@@ -105,20 +105,6 @@
       popular: false,
     },
   ];
-
-  let selectedClient = "";
-  let clients = [
-    { id: "", name: "Select a client" },
-    { id: "client1", name: "Client 1" },
-    { id: "client2", name: "Client 2" },
-    { id: "client3", name: "Client 3" },
-    { id: "client4", name: "Client 4" },
-    { id: "client5", name: "Client 5" },
-  ];
-  function handleClientChange(event) {
-    selectedClient = event.target.value;
-    dispatch("clientSelected", { clientId: selectedClient });
-  }
 
   onMount(() => {
     // Check for auth parameter in URL (from subdomain redirect)
@@ -475,6 +461,27 @@
 </svelte:head>
 
 <div class="app-container">
+  <!-- <header class="header">
+    <div class="header-content">
+      <h1 class="logo">
+        <span class="logo-icon"><Logo /></span>
+        MyAR
+      </h1>
+      <div class="header-actions">
+        <span class="welcome-text">Welcome, {user?.name || "Admin"}</span>
+        <div class="action-buttons-group">
+          <a href="/dashboard" class="action-btn dashboard-btn">
+            <span class="btn-text">Dashboard</span>
+          </a>
+
+          <button class="action-btn logout-btn" on:click={logout}>
+            <Power />
+          </button>
+        </div>
+      </div>
+    </div>
+  </header> -->
+
   <main class="main-content">
     <!-- Pricing Plans Section -->
     {#if showPricingPlans}
@@ -553,27 +560,6 @@
     <div class="upload-section">
       <div class="upload-container">
         <h2 class="section-title">Upload AR Filter</h2>
-
-        <!-- Client Selection Field -->
-        <div class="form-group">
-          <label for="client-select" class="form-label">Select Client</label>
-          <div class="select-wrapper">
-            <select
-              id="client-select"
-              bind:value={selectedClient}
-              on:change={handleClientChange}
-              class="client-select"
-              disabled={isUploading || uploadSuccess}
-            >
-              {#each clients as client}
-                <option value={client.id}>{client.name}</option>
-              {/each}
-            </select>
-            <div class="select-arrow">
-              <ChevronDown />
-            </div>
-          </div>
-        </div>
 
         <div
           class="upload-area"
@@ -728,7 +714,7 @@
             </div>
 
             <div class="check-box">
-              <div>
+              <div class="form-group">
                 <label class="checkbox-label">
                   <input
                     type="checkbox"
@@ -740,8 +726,7 @@
                   <span class="checkbox-text">AI powered</span>
                 </label>
               </div>
-
-              <div>
+              <div class="form-group">
                 <label class="checkbox-label">
                   <input
                     type="checkbox"
@@ -752,8 +737,7 @@
                   <span class="checkbox-text">Location required</span>
                 </label>
               </div>
-
-              <div>
+              <div class="form-group">
                 <label class="checkbox-label">
                   <input
                     type="checkbox"
@@ -761,7 +745,7 @@
                     disabled={isUploading}
                   />
                   <span class="checkbox-custom"></span>
-                  <span class="checkbox-text">Mobile number required</span>
+                  <span class="checkbox-text">Mobile required</span>
                 </label>
               </div>
             </div>
@@ -833,11 +817,11 @@
     {#if filterLink}
       <div class="share-section">
         <div class="share-container">
-          <h3 class="section-title">🎉 Filter Successfully Created!</h3>
+          <h3 class="section-title">Filter Successfully Created!</h3>
 
-          <div class="filter-success">
+          <div class="fiter-details">
             <div class="filter-summary">
-              <h3 class="title">Filter Details</h3>
+              <h4>Filter Details</h4>
 
               <div class="summary-item">
                 <span class="summary-label">Filter Name:</span>
@@ -868,18 +852,29 @@
               </div>
               <div class="summary-item">
                 <span class="summary-label">Location required:</span>
-                <span> </span>
+                <!-- <span
+                  class="summary-value {filterForm.ai_need
+                    ? 'ai-yes'
+                    : 'ai-no'}"
+                >
+                  {filterForm.ai_need ? "Yes" : "No"}
+                </span> -->
               </div>
               <div class="summary-item">
-                <span class="summary-label">Mobile number required:</span>
-                <span> </span>
+                <span class="summary-label">Mobile required:</span>
+                <!-- <span
+                  class="summary-value {filterForm.ai_need
+                    ? 'ai-yes'
+                    : 'ai-no'}"
+                >
+                  {filterForm.ai_need ? "Yes" : "No"}
+                </span> -->
               </div>
             </div>
 
             <div class="share-content">
-              <h3 class="title">Filter Assets</h3>
-
               <div class="link-section">
+                <h4>Filter Assets</h4>
                 <div class="input-group">
                   <input
                     type="text"
@@ -915,15 +910,11 @@
                     >
                       <ArrowDownToLine />
                     </button>
-                    <button class="download-qr-btn" title="share">
+                    <button class="download-qr-btn" title="Share QR Code">
                       <Share />
                     </button>
-                    <button class="download-qr-btn" class:copied={copySuccess}>
-                      {#if copySuccess}
-                        <span class="copy-success">✓ Copied!</span>
-                      {:else}
-                        <Copy />
-                      {/if}
+                    <button class="download-qr-btn" title="Copy QR Code">
+                      <Copy />
                     </button>
                   </div>
                 </div>
@@ -966,102 +957,6 @@
     font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
     min-height: 100vh;
-  }
-
-  /* Form Group Styles */
-  .form-group {
-    margin-bottom: 1.5rem;
-  }
-
-  .form-label {
-    display: block;
-    color: #2d3748;
-    font-weight: 600;
-    font-size: 1.1rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .filter-success {
-    display: flex;
-    justify-content: space-between;
-    gap: 2rem;
-  }
-  .select-wrapper {
-    position: relative;
-    width: 100%;
-  }
-
-  .client-select {
-    width: 100%;
-    padding: 1rem 3rem 1rem 1rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    background: #f7fafc;
-    color: #2d3748;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    appearance: none;
-    cursor: pointer;
-  }
-
-  .client-select:focus {
-    outline: none;
-    border-color: #6366f1;
-    background: white;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-  }
-
-  .client-select:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    background: #f3f4f6;
-  }
-
-  .select-arrow {
-    position: absolute;
-    right: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #6b7280;
-    pointer-events: none;
-    transition: transform 0.3s ease;
-  }
-
-  .check-box {
-    display: flex;
-    justify-content: space-between;
-    justify-items: center;
-  }
-
-  .client-select:focus + .select-arrow {
-    transform: translateY(-50%) rotate(180deg);
-  }
-
-  /* Responsive Design for Select Client */
-  @media (max-width: 768px) {
-    .form-group {
-      margin-bottom: 1rem;
-    }
-
-    .client-select {
-      padding: 0.875rem 2.5rem 0.875rem 0.875rem;
-      font-size: 0.9rem;
-    }
-
-    .select-arrow {
-      right: 0.875rem;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .form-label {
-      font-size: 1rem;
-    }
-
-    .client-select {
-      padding: 0.75rem 2.25rem 0.75rem 0.75rem;
-      font-size: 0.85rem;
-    }
   }
 
   .app-container {
@@ -1220,6 +1115,11 @@
     box-sizing: border-box;
   }
 
+  .fiter-details {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
   /* Pricing Plans Styles */
   .pricing-section {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -1317,6 +1217,12 @@
     font-size: 0.8rem;
     font-weight: 600;
     box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+  }
+
+  .check-box {
+    margin-top: 0.5rem;
+    display: flex;
+    justify-content: space-between;
   }
 
   .plan-header {
@@ -1460,7 +1366,6 @@
     font-size: 1.8rem;
     font-weight: 600;
     margin: 0 0 1.5rem 0;
-    text-align: start;
   }
 
   .upload-area {
@@ -1661,20 +1566,24 @@
     padding: 1.5rem;
     margin-bottom: 2rem;
     border: 1px solid #e2e8f0;
-  }
-
-  /* .share-content {
-    display: grid;
-    grid-template-columns: 1fr;
+    /* display: grid; */
+    /* grid-template-columns: 1fr; */
     gap: 2rem;
-  } */
+  }
+  .qr-section {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+  }
+  .qr-btn {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
 
   .link-section,
   .qr-section {
-    display: flex;
     text-align: center;
-    margin-top: 1rem;
-    gap: 0.5rem;
   }
 
   .input-label {
@@ -1752,12 +1661,11 @@
   .qr-container {
     display: inline-block;
     background: white;
-    padding: 1.5rem;
+    padding: 0.5rem;
     border-radius: 15px;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
     text-align: center;
     border: 1px solid #e2e8f0;
-    width: 180px;
   }
 
   .qr-image {
@@ -1768,21 +1676,16 @@
 
   .qr-text {
     color: #4a5568;
-    font-size: small;
-  }
-  .qr-btn {
-    display: flex;
-    flex-direction: column; /* or 'row' if you want them side-by-side */
-    align-items: center;
-    justify-content: space-between;
   }
 
   .download-qr-btn {
     background: #0511f3;
     color: white;
     border: none;
+    border-radius: 12px;
     padding: 0.8rem 1.5rem;
     cursor: pointer;
+    font-size: 0.9rem;
     font-weight: 600;
     transition: all 0.3s ease;
     display: inline-flex;
@@ -1790,15 +1693,10 @@
     gap: 0.5rem;
     box-shadow: 0 4px 15px rgba(6, 214, 160, 0.3);
     margin-top: 0.5rem;
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 1.2rem;
-    transition: all 0.3s ease;
   }
 
   .download-qr-btn:hover {
@@ -1937,6 +1835,7 @@
     gap: 0.5rem;
     box-shadow: 0 4px 15px rgba(6, 214, 160, 0.3);
     transition: all 0.3s ease;
+    /* margin-top: 1rem; */
   }
 
   .submit-btn:hover:not(:disabled) {
@@ -1997,13 +1896,14 @@
     padding: 1.5rem;
     margin-bottom: 2rem;
     border: 1px solid #e2e8f0;
-    width: 70%;
+    width: 80%;
+    text-align: center;
   }
 
   .summary-item {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 3rem;
+    margin-bottom: 0.8rem;
   }
 
   .summary-item:last-child {
@@ -2080,7 +1980,7 @@
   /* Responsive Design */
   @media (min-width: 768px) {
     .share-content {
-      grid-template-columns: 1fr 1fr;
+      /* grid-template-columns: 1fr 1fr; */
       align-items: start;
     }
 

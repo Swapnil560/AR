@@ -1,77 +1,38 @@
 <script>
+  import { onMount } from "svelte";
   import PricingCard from "./PricingCard.svelte";
   import EventPackCard from "./EventPackCard.svelte";
   import FilterBenefits from "./FilterBenefits.svelte";
+  import { getPricePlans } from "../../../services/actions/price-plans.js";
+  
   let isAnnual = false;
+  let subscriptionPlans = [];
+  let loading = true;
 
   const toggleAnnual = () => {
     isAnnual = !isAnnual;
   };
 
-  const subscriptionPlans = [
-    {
-      name: "Starter",
-      description: "Perfect for individuals & first-time creators",
-      monthlyPrice: 6999,
-      annualPrice: 32000,
-      features: [
-        "1 Static Filter / month",
-        "Logo & text overlay customization",
-        "Email support",
-        "Basic analytics dashboard",
-      ],
-      cta: "Start with Starter",
-      popular: false,
-    },
-    {
-      name: "Growth",
-      description: "Best for small businesses, restaurants & salons",
-      monthlyPrice: 24999,
-      annualPrice: 249999,
-      features: [
-        "Up to 3 Animated Filters / month",
-        "Logo + Branding + Call-to-Action",
-        "Email + Chat support",
-        "Advanced analytics & insights",
-        "Social media integration",
-      ],
-      cta: "Upgrade to Growth",
-      popular: false,
-    },
-    {
-      name: "Pro AI",
-      description:
-        "Designed for D2C brands, colleges & high-engagement campaigns",
-      monthlyPrice: 29999,
-      annualPrice: 299999,
-      features: [
-        "Up to 12 AI-Powered Filters / month",
-        "Face-tracking, full brand customization",
-        "Priority support",
-        "Custom AI training",
-        "White-label options",
-        "API access",
-      ],
-      cta: "Choose Pro AI",
-      popular: true,
-    },
-    {
-      name: "Enterprise",
-      description: "Ideal for enterprises, agencies & nationwide campaigns",
-      monthlyPrice: null,
-      annualPrice: null,
-      features: [
-        "Up to 20 Static + Animated + AI Filters / month",
-        "Advanced AI features",
-        "White-label branding + Custom dashboard",
-        "Dedicated account manager",
-        "Custom integrations",
-        "SLA guarantees",
-      ],
-      cta: "Contact Us",
-      popular: false,
-    },
-  ];
+  onMount(async () => {
+    try {
+      const response = await getPricePlans({ sort: "monthly_price" });
+      if (!response.err && response.result) {
+        subscriptionPlans = response.result.map(plan => ({
+          name: plan.name,
+          description: plan.description || "",
+          monthlyPrice: plan.monthly_price ? parseInt(plan.monthly_price) : null,
+          annualPrice: plan.yearly_price ? parseInt(plan.yearly_price) : null,
+          features: plan.features ? plan.features.split('\n').filter(f => f.trim()) : [],
+          cta: `Choose ${plan.name}`,
+          popular: plan.name.toLowerCase().includes('pro')
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load pricing plans:', error);
+    } finally {
+      loading = false;
+    }
+  });
 
   const eventPacks = [
     {
@@ -129,9 +90,13 @@
 
     <!-- Subscription Plans -->
     <div class="plans">
-      {#each subscriptionPlans as plan, index}
-        <PricingCard {...plan} {isAnnual} delay={index * 100} />
-      {/each}
+      {#if loading}
+        <div class="loading">Loading plans...</div>
+      {:else}
+        {#each subscriptionPlans as plan, index}
+          <PricingCard {...plan} {isAnnual} delay={index * 100} />
+        {/each}
+      {/if}
     </div>
 
     <!-- Event Packs -->
@@ -347,6 +312,14 @@
     .event-header p {
       font-size: 1rem;
     }
+  }
+  
+  .loading {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+    font-size: 1.1rem;
   }
   
   @media (max-width: 480px) {

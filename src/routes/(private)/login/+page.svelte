@@ -55,9 +55,9 @@
       if (user.role === "super_admin") {
         targetPath = "/superadmin";
       } else if (user.role === "admin") {
-        targetPath = "/admin";
+        targetPath = "/clientadmin";
       } else {
-        targetPath = "/dashboard";
+        targetPath = "/clientadmin";
       }
 
       // If user has a subdomain, redirect to subdomain URL

@@ -10,8 +10,8 @@
 
   // You can pass these as props if they need to be dynamic
   let stats = {
-    appOpens: 1234,
-    cameraAccess: 876,
+    appOpens: 1250,
+    cameraAccess: 850,
     mediaCaptured: 543,
     appDropouts: 211,
   };

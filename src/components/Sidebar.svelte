@@ -8,17 +8,69 @@
     CreditCard,
   } from "lucide-svelte";
   import logo from "../lib/assets/pic.png";
+  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
 
   export let activeSection: string = "dashboard";
   export let switchSection: (section: string) => void;
   export let logout: () => void;
+  export let user: any = null;
+
+  onMount(() => {
+    // Check for auth parameter in URL (from subdomain redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const authParam = urlParams.get("auth");
+
+    if (authParam) {
+      try {
+        // Decode user data from URL parameter
+        const userData = JSON.parse(atob(authParam));
+        console.log("User data from URL:", userData);
+
+        // Store in localStorage for the current domain/subdomain
+        localStorage.setItem("user", JSON.stringify(userData));
+
+        // Clean up URL by removing auth parameter
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+
+        user = userData;  // This sets the user state
+      } catch (error) {
+        console.error("Error parsing auth parameter:", error);
+        goto("/login");
+        return;
+      }
+    } else {
+      // Check if user is logged in from localStorage
+      const userData = localStorage.getItem("user");
+      if (!userData) {
+        goto("/login");
+        return;
+      }
+      user = JSON.parse(userData);
+    }
+
+    // Redirect based on user role if needed
+    if (user.role === "super_admin") {
+      // You can add redirect logic here if needed
+      console.log("Super admin detected");
+    }
+  });
 </script>
 
 <aside class="sidebar">
   <nav class="sidebar-nav">
     <div class="logo-section">
       <img src={logo} alt="logo" />
-      <span class="admin-text">Admin</span>
+      <span class="admin-text">
+        {#if user?.role === "super_admin"}
+          Admin
+        {:else if user?.role === "admin"}
+          {user?.name || "User"}
+        {:else}
+          {user?.name || "User"}
+        {/if}
+      </span>
     </div>
     <button
       class="nav-item {activeSection === 'dashboard' ? 'active' : ''}"
@@ -34,13 +86,15 @@
       <Palette size="20" />
       <span class="nav-text">Filter</span>
     </button>
-    <button
-      class="nav-item {activeSection === 'clients' ? 'active' : ''}"
-      on:click={() => switchSection("clients")}
-    >
-      <User2 size="20" />
-      <span class="nav-text">Clients</span>
-    </button>
+    {#if user?.role === "super_admin"}
+      <button
+        class="nav-item {activeSection === 'clients' ? 'active' : ''}"
+        on:click={() => switchSection("clients")}
+      >
+        <User2 size="20" />
+        <span class="nav-text">Clients</span>
+      </button>
+    {/if}
     <button
       class="nav-item {activeSection === 'reports' ? 'active' : ''}"
       on:click={() => switchSection("reports")}

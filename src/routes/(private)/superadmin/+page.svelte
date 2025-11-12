@@ -42,10 +42,12 @@
   import graph from "../../../lib/assets/SVG (4).png";
   import Header from "../../../components/Header.svelte";
   import Sidebar from "../../../components/Sidebar.svelte";
-  import Dashboard from "./dashboard.svelte";
   import ImageUpload from "./ImageUpload.svelte";
   import Client from "./client.svelte";
   import FilterGrid from "./filterGrid.svelte";
+  import Filterpage from "./filterpage.svelte";
+  import Dashboard from "../../../components/dashboard.svelte";
+  import FilterReports from "../../../components/FilterReports.svelte";
 
   let user = null;
   let activeSection = "dashboard";
@@ -736,8 +738,8 @@
         </div>
 
         <!-- Image Upload Section -->
-        {#if showImageUpload}
-          <div>
+        {#if showImageUpload} 
+         <div>
             <ImageUpload
               {isUploading}
               {uploadSuccess}
@@ -893,14 +895,19 @@
               on:fileSelected={handleFileSelected}
             />
 
-            <FilterGrid />
+            <!-- <FilterGrid /> -->
           {/if}
           {#if activeSection === "clients"}
             <Client />
           {/if}
 
+          <!-- Reports Section -->
+          {#if activeSection === "reports"}
+            <FilterReports />
+          {/if}
+
           <!-- Price Plans Section -->
-          <!-- {#if activeSection === "plans"}
+          {#if activeSection === "plans"}
             <div class="section-content">
               <div class="section-header">
                 <h2 class="section-title">Price Plan Management</h2>
@@ -940,6 +947,7 @@
                     <thead>
                       <tr>
                         <th>Plan Name</th>
+                        <th>Description</th>
                         <th>Monthly Price</th>
                         <th>Yearly Price</th>
                         <th>Filters</th>
@@ -956,6 +964,9 @@
                             <div class="plan-name">
                               <strong>{plan.name}</strong>
                             </div>
+                          </td>
+                          <td>
+                            <span class="feature-value truncate">{plan.description || "N/A"}</span>
                           </td>
                           <td>
                             <span class="price">₹{plan.monthly_price}</span>
@@ -979,9 +990,13 @@
                             >
                           </td>
                           <td>
-                            <span class="feature-value truncate"
-                              >{plan.features || "N/A"}</span
-                            >
+                            <span class="feature-value truncate">
+                              {#if plan.features}
+                                {plan.features.split(' ')[0]}...
+                              {:else}
+                                N/A
+                              {/if}
+                            </span>
                           </td>
                           <td>
                             <div class="action-buttons">
@@ -1119,7 +1134,7 @@
                 </div>
               {/if}
             </div>
-          {/if} -->
+          {/if}
         {/if}
       </div>
     </main>
@@ -1321,7 +1336,7 @@
 {/if} -->
 
 <!-- Create Price Plan Modal -->
-<!-- {#if showCreatePlanModal}
+{#if showCreatePlanModal}
   <div class="modal-overlay" on:click={() => (showCreatePlanModal = false)}>
     <div class="modal" on:click|stopPropagation>
       <div class="modal-header">
@@ -1404,12 +1419,12 @@
 
           <div class="form-group">
             <label for="features">Features</label>
-            <input
+            <textarea
               id="features"
-              type="text"
               bind:value={planForm.features}
-              placeholder="e.g., Basic filters, Advanced AI, Priority support"
-            />
+              placeholder="e.g., Basic filters&#10;Advanced AI&#10;Priority support"
+              rows="4"
+            ></textarea>
           </div>
 
           <div class="form-actions">
@@ -1433,10 +1448,10 @@
       </div>
     </div>
   </div>
-{/if} -->
+{/if}
 
 <!-- Price Plan View/Edit Modal -->
-<!-- {#if showPlanModal && selectedPlan}
+{#if showPlanModal && selectedPlan}
   <div class="modal-overlay" on:click={() => (showPlanModal = false)}>
     <div class="modal" on:click|stopPropagation>
       <div class="modal-header">
@@ -1519,12 +1534,12 @@
 
             <div class="form-group">
               <label for="editFeatures">Features</label>
-              <input
+              <textarea
                 id="editFeatures"
-                type="text"
                 bind:value={planForm.features}
-                placeholder="e.g., Basic filters, Advanced AI, Priority support"
-              />
+                placeholder="e.g., Basic filters&#10;Advanced AI&#10;Priority support"
+                rows="4"
+              ></textarea>
             </div>
 
             <div class="form-actions">
@@ -1587,7 +1602,15 @@
             </div>
             <div class="detail-row">
               <span class="detail-label">Features:</span>
-              <span class="detail-value">{selectedPlan.features || "N/A"}</span>
+              <div class="detail-value features-list">
+                {#if selectedPlan.features}
+                  {#each selectedPlan.features.split('\n') as feature}
+                    <div class="feature-item">{feature}</div>
+                  {/each}
+                {:else}
+                  N/A
+                {/if}
+              </div>
             </div>
             <div class="detail-row">
               <span class="detail-label">Created:</span>
@@ -1614,7 +1637,7 @@
       </div>
     </div>
   </div>
-{/if} -->
+{/if}
 
 <style>
   :global(body) {
@@ -1889,7 +1912,7 @@
   .table-container {
     background: white;
     border-radius: 16px;
-    overflow: hidden;
+    overflow-x: auto;
     border: 1px solid #e2e8f0;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   }
@@ -1995,7 +2018,8 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-start;
-    min-width: 140px;
+    min-width: 120px;
+    width: 120px;
   }
 
   .filter-preview {
@@ -2150,7 +2174,8 @@
     margin-bottom: 0.5rem;
   }
 
-  .form-group input {
+  .form-group input,
+  .form-group textarea {
     width: 100%;
     padding: 1rem;
     border: 1px solid #d1d5db;
@@ -2160,15 +2185,19 @@
     font-size: 1rem;
     box-sizing: border-box;
     transition: all 0.3s ease;
+    font-family: inherit;
+    resize: vertical;
   }
 
-  .form-group input:focus {
+  .form-group input:focus,
+  .form-group textarea:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
   }
 
-  .form-group input::placeholder {
+  .form-group input::placeholder,
+  .form-group textarea::placeholder {
     color: #9ca3af;
   }
 
@@ -2404,7 +2433,7 @@
   }
 
   .feature-value.truncate {
-    max-width: 150px;
+    max-width: 20px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2418,6 +2447,21 @@
     font-size: 1.2rem;
     font-weight: 700;
     color: #16a34a;
+  }
+
+  .features-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .feature-item {
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .feature-item:last-child {
+    border-bottom: none;
   }
 
   .empty-icon {

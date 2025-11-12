@@ -2,12 +2,19 @@
   import { Menu, Search, Settings, Megaphone, User, Box } from "lucide-svelte";
 
   export let sidebarWidth = 250;
+  export let onProfileClick: () => void; // Add this prop
   
   // Function to handle menu click (for mobile toggle)
   function handleMenuClick() {
-    // You can emit an event here to toggle sidebar on mobile
     const event = new CustomEvent('toggleSidebar');
     window.dispatchEvent(event);
+  }
+
+  // Function to handle profile icon click
+  function handleProfileClick() {
+    if (onProfileClick) {
+      onProfileClick();
+    }
   }
 </script>
 
@@ -32,12 +39,15 @@
         <Megaphone class="icon" />
         <span class="notification-badge">3</span>
       </div>
-      <User class="icon" />
+      <button class="profile-button" on:click={handleProfileClick}>
+        <User class="icon" />
+      </button>
     </div>
   </div>
 </header>
 
 <style>
+  /* Your existing header styles remain the same */
   .header {
     background: #fff;
     position: fixed;
@@ -79,13 +89,26 @@
     padding: 0.5rem;
     border-radius: 6px;
     cursor: pointer;
-    display: flex; /* Changed from 'none' to 'flex' */
+    display: flex;
     align-items: center;
     justify-content: center;
     transition: background-color 0.2s ease;
   }
 
-  .menu-button:hover {
+  .profile-button {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+  }
+
+  .menu-button:hover,
+  .profile-button:hover {
     background: #f7f9fc;
   }
 
@@ -151,20 +174,18 @@
     justify-content: center;
   }
 
-  /* Medium and small screens (matches sidebar breakpoint) */
+  /* Your existing responsive styles remain the same */
   @media (max-width: 1024px) {
     .header {
       left: 60px;
       width: calc(100vw - 60px);
     }
 
-    /* Remove the display: flex from here since it's now the default */
     .search-bar {
       width: 180px;
     }
   }
 
-  /* Small screens */
   @media (max-width: 768px) {
     .header {
       left: 60px;
@@ -186,7 +207,6 @@
     }
   }
 
-  /* Extra small screens */
   @media (max-width: 640px) {
     .header {
       left: 0;
@@ -213,7 +233,6 @@
     }
   }
 
-  /* Very small screens */
   @media (max-width: 480px) {
     .header-content {
       padding: 0.6rem 0.8rem;
@@ -238,7 +257,6 @@
     }
   }
 
-  /* When sidebar is completely hidden on very small screens */
   @media (max-width: 360px) {
     .header {
       left: 0;
